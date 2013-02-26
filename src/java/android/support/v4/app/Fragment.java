@@ -524,7 +524,6 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
         }
         mSavedFragmentState = state != null && state.mState != null
                 ? state.mState : null;
-        mSavedFragmentState.setClassLoader(getClass().getClassLoader());
     }
 
     /**
