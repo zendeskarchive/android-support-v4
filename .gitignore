@@ -1,5 +1,6 @@
 local.properties
 .settings
+.project
 bin
 gen
 
