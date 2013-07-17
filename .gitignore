@@ -17,3 +17,6 @@ gen-external-apklibs
 
 #Emacs
 *~
+
+# Gradle
+build
