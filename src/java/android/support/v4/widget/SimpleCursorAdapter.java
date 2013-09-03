@@ -63,7 +63,7 @@ public class SimpleCursorAdapter extends ResourceCursorAdapter {
         super(context, layout, c);
         mTo = to;
         mOriginalFrom = from;
-        findColumns(from);
+        findColumns(c, from);
     }
 
     /**
@@ -89,7 +89,7 @@ public class SimpleCursorAdapter extends ResourceCursorAdapter {
         super(context, layout, c, flags);
         mTo = to;
         mOriginalFrom = from;
-        findColumns(from);
+        findColumns(c, from);
     }
 
     /**
@@ -301,20 +301,21 @@ public class SimpleCursorAdapter extends ResourceCursorAdapter {
     }
 
     /**
-     * Create a map from an array of strings to an array of column-id integers in mCursor.
-     * If mCursor is null, the array will be discarded.
-     * 
+     * Create a map from an array of strings to an array of column-id integers in cursor c.
+     * If c is null, the array will be discarded.
+     *
+     * @param c the cursor to find the columns from
      * @param from the Strings naming the columns of interest
      */
-    private void findColumns(String[] from) {
-        if (mCursor != null) {
+    private void findColumns(Cursor c, String[] from) {
+        if (c != null) {
             int i;
             int count = from.length;
             if (mFrom == null || mFrom.length != count) {
                 mFrom = new int[count];
             }
             for (i = 0; i < count; i++) {
-                mFrom[i] = mCursor.getColumnIndexOrThrow(from[i]);
+                mFrom[i] = c.getColumnIndexOrThrow(from[i]);
             }
         } else {
             mFrom = null;
@@ -323,17 +324,18 @@ public class SimpleCursorAdapter extends ResourceCursorAdapter {
 
     @Override
     public Cursor swapCursor(Cursor c) {
-        Cursor res = super.swapCursor(c);
-        // rescan columns in case cursor layout is different
-        findColumns(mOriginalFrom);
-        return res;
+        // super.swapCursor() will notify observers before we have
+        // a valid mapping, make sure we have a mapping before this
+        // happens
+        findColumns(c, mOriginalFrom);
+        return super.swapCursor(c);
     }
-    
+
     /**
      * Change the cursor and change the column-to-view mappings at the same time.
-     *  
+     *
      * @param c The database cursor.  Can be null if the cursor is not available yet.
-     * @param from A list of column names representing the data to bind to the UI.  Can be null 
+     * @param from A list of column names representing the data to bind to the UI.  Can be null
      *            if the cursor is not available yet.
      * @param to The views that should display column in the "from" parameter.
      *            These should all be TextViews. The first N views in this list
@@ -343,8 +345,11 @@ public class SimpleCursorAdapter extends ResourceCursorAdapter {
     public void changeCursorAndColumns(Cursor c, String[] from, int[] to) {
         mOriginalFrom = from;
         mTo = to;
-        super.changeCursor(c);        
-        findColumns(mOriginalFrom);
+        // super.changeCursor() will notify observers before we have
+        // a valid mapping, make sure we have a mapping before this
+        // happens
+        findColumns(c, mOriginalFrom);
+        super.changeCursor(c);
     }
 
     /**
