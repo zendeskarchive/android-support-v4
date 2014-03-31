@@ -20,13 +20,12 @@ package android.support.v4.app;
 import android.app.Activity;
 import android.content.res.Configuration;
 import android.graphics.Canvas;
-import android.graphics.ColorFilter;
-import android.graphics.PorterDuff;
 import android.graphics.Rect;
-import android.graphics.Region;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.InsetDrawable;
 import android.os.Build;
 import android.support.v4.view.GravityCompat;
+import android.support.v4.view.ViewCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.view.MenuItem;
 import android.view.View;
@@ -138,16 +137,42 @@ public class ActionBarDrawerToggle implements DrawerLayout.DrawerListener {
         }
     }
 
+    private static class ActionBarDrawerToggleImplJellybeanMR2
+            implements ActionBarDrawerToggleImpl {
+        @Override
+        public Drawable getThemeUpIndicator(Activity activity) {
+            return ActionBarDrawerToggleJellybeanMR2.getThemeUpIndicator(activity);
+        }
+
+        @Override
+        public Object setActionBarUpIndicator(Object info, Activity activity,
+                Drawable themeImage, int contentDescRes) {
+            return ActionBarDrawerToggleJellybeanMR2.setActionBarUpIndicator(info, activity,
+                    themeImage, contentDescRes);
+        }
+
+        @Override
+        public Object setActionBarDescription(Object info, Activity activity, int contentDescRes) {
+            return ActionBarDrawerToggleJellybeanMR2.setActionBarDescription(info, activity,
+                    contentDescRes);
+        }
+    }
+
     private static final ActionBarDrawerToggleImpl IMPL;
 
     static {
         final int version = Build.VERSION.SDK_INT;
-        if (version >= 11) {
+        if (version >= 18) {
+            IMPL = new ActionBarDrawerToggleImplJellybeanMR2();
+        } else if (version >= 11) {
             IMPL = new ActionBarDrawerToggleImplHC();
         } else {
             IMPL = new ActionBarDrawerToggleImplBase();
         }
     }
+
+    /** Fraction of its total width by which to offset the toggle drawable. */
+    private static final float TOGGLE_DRAWABLE_OFFSET = 1 / 3f;
 
     // android.R.id.home as defined by public API in v11
     private static final int ID_HOME = 0x0102002c;
@@ -188,6 +213,14 @@ public class ActionBarDrawerToggle implements DrawerLayout.DrawerListener {
     public ActionBarDrawerToggle(Activity activity, DrawerLayout drawerLayout,
             int drawerImageRes, int openDrawerContentDescRes, int closeDrawerContentDescRes) {
         mActivity = activity;
+
+        // Allow the Activity to provide an impl
+        if (activity instanceof DelegateProvider) {
+            mActivityImpl = ((DelegateProvider) activity).getDrawerToggleDelegate();
+        } else {
+            mActivityImpl = null;
+        }
+
         mDrawerLayout = drawerLayout;
         mDrawerImageResource = drawerImageRes;
         mOpenDrawerContentDescRes = openDrawerContentDescRes;
@@ -196,14 +229,7 @@ public class ActionBarDrawerToggle implements DrawerLayout.DrawerListener {
         mThemeImage = getThemeUpIndicator();
         mDrawerImage = activity.getResources().getDrawable(drawerImageRes);
         mSlider = new SlideDrawable(mDrawerImage);
-        mSlider.setOffsetBy(1.f / 3);
-
-        // Allow the Activity to provide an impl
-        if (activity instanceof DelegateProvider) {
-            mActivityImpl = ((DelegateProvider) activity).getDrawerToggleDelegate();
-        } else {
-            mActivityImpl = null;
-        }
+        mSlider.setOffset(TOGGLE_DRAWABLE_OFFSET);
     }
 
     /**
@@ -217,14 +243,14 @@ public class ActionBarDrawerToggle implements DrawerLayout.DrawerListener {
      */
     public void syncState() {
         if (mDrawerLayout.isDrawerOpen(GravityCompat.START)) {
-            mSlider.setOffset(1.f);
+            mSlider.setPosition(1);
         } else {
-            mSlider.setOffset(0.f);
+            mSlider.setPosition(0);
         }
 
         if (mDrawerIndicatorEnabled) {
             setActionBarUpIndicator(mSlider, mDrawerLayout.isDrawerOpen(GravityCompat.START) ?
-                    mOpenDrawerContentDescRes : mCloseDrawerContentDescRes);
+                    mCloseDrawerContentDescRes : mOpenDrawerContentDescRes);
         }
     }
 
@@ -242,7 +268,7 @@ public class ActionBarDrawerToggle implements DrawerLayout.DrawerListener {
         if (enable != mDrawerIndicatorEnabled) {
             if (enable) {
                 setActionBarUpIndicator(mSlider, mDrawerLayout.isDrawerOpen(GravityCompat.START) ?
-                                mOpenDrawerContentDescRes : mCloseDrawerContentDescRes);
+                        mCloseDrawerContentDescRes : mOpenDrawerContentDescRes);
             } else {
                 setActionBarUpIndicator(mThemeImage, 0);
             }
@@ -303,13 +329,13 @@ public class ActionBarDrawerToggle implements DrawerLayout.DrawerListener {
      */
     @Override
     public void onDrawerSlide(View drawerView, float slideOffset) {
-        float glyphOffset = mSlider.getOffset();
+        float glyphOffset = mSlider.getPosition();
         if (slideOffset > 0.5f) {
             glyphOffset = Math.max(glyphOffset, Math.max(0.f, slideOffset - 0.5f) * 2);
         } else {
             glyphOffset = Math.min(glyphOffset, slideOffset * 2);
         }
-        mSlider.setOffset(glyphOffset);
+        mSlider.setPosition(glyphOffset);
     }
 
     /**
@@ -321,9 +347,9 @@ public class ActionBarDrawerToggle implements DrawerLayout.DrawerListener {
      */
     @Override
     public void onDrawerOpened(View drawerView) {
-        mSlider.setOffset(1.f);
+        mSlider.setPosition(1);
         if (mDrawerIndicatorEnabled) {
-            setActionBarDescription(mOpenDrawerContentDescRes);
+            setActionBarDescription(mCloseDrawerContentDescRes);
         }
     }
 
@@ -336,9 +362,9 @@ public class ActionBarDrawerToggle implements DrawerLayout.DrawerListener {
      */
     @Override
     public void onDrawerClosed(View drawerView) {
-        mSlider.setOffset(0.f);
+        mSlider.setPosition(0);
         if (mDrawerIndicatorEnabled) {
-            setActionBarDescription(mCloseDrawerContentDescRes);
+            setActionBarDescription(mOpenDrawerContentDescRes);
         }
     }
 
@@ -378,176 +404,63 @@ public class ActionBarDrawerToggle implements DrawerLayout.DrawerListener {
                 .setActionBarDescription(mSetIndicatorInfo, mActivity, contentDescRes);
     }
 
-    private static class SlideDrawable extends Drawable implements Drawable.Callback {
-        private Drawable mWrapped;
-        private float mOffset;
-        private float mOffsetBy;
-
+    private class SlideDrawable extends InsetDrawable implements Drawable.Callback {
+        private final boolean mHasMirroring = Build.VERSION.SDK_INT > 18;
         private final Rect mTmpRect = new Rect();
 
-        public SlideDrawable(Drawable wrapped) {
-            mWrapped = wrapped;
+        private float mPosition;
+        private float mOffset;
+
+        private SlideDrawable(Drawable wrapped) {
+            super(wrapped, 0);
         }
 
+        /**
+         * Sets the current position along the offset.
+         *
+         * @param position a value between 0 and 1
+         */
+        public void setPosition(float position) {
+            mPosition = position;
+            invalidateSelf();
+        }
+
+        public float getPosition() {
+            return mPosition;
+        }
+
+        /**
+         * Specifies the maximum offset when the position is at 1.
+         *
+         * @param offset maximum offset as a fraction of the drawable width,
+         *            positive to shift left or negative to shift right.
+         * @see #setPosition(float)
+         */
         public void setOffset(float offset) {
             mOffset = offset;
             invalidateSelf();
         }
 
-        public float getOffset() {
-            return mOffset;
-        }
-
-        public void setOffsetBy(float offsetBy) {
-            mOffsetBy = offsetBy;
-            invalidateSelf();
-        }
-
         @Override
         public void draw(Canvas canvas) {
-            mWrapped.copyBounds(mTmpRect);
+            copyBounds(mTmpRect);
             canvas.save();
-            canvas.translate(mOffsetBy * mTmpRect.width() * -mOffset, 0);
-            mWrapped.draw(canvas);
+
+            // Layout direction must be obtained from the activity.
+            final boolean isLayoutRTL = ViewCompat.getLayoutDirection(
+                    mActivity.getWindow().getDecorView()) == ViewCompat.LAYOUT_DIRECTION_RTL;
+            final int flipRtl = isLayoutRTL ? -1 : 1;
+            final int width = mTmpRect.width();
+            canvas.translate(-mOffset * width * mPosition * flipRtl, 0);
+
+            // Force auto-mirroring if it's not supported by the platform.
+            if (isLayoutRTL && !mHasMirroring) {
+                canvas.translate(width, 0);
+                canvas.scale(-1, 1);
+            }
+
+            super.draw(canvas);
             canvas.restore();
-        }
-
-        @Override
-        public void setChangingConfigurations(int configs) {
-            mWrapped.setChangingConfigurations(configs);
-        }
-
-        @Override
-        public int getChangingConfigurations() {
-            return mWrapped.getChangingConfigurations();
-        }
-
-        @Override
-        public void setDither(boolean dither) {
-            mWrapped.setDither(dither);
-        }
-
-        @Override
-        public void setFilterBitmap(boolean filter) {
-            mWrapped.setFilterBitmap(filter);
-        }
-
-        @Override
-        public void setAlpha(int alpha) {
-            mWrapped.setAlpha(alpha);
-        }
-
-        @Override
-        public void setColorFilter(ColorFilter cf) {
-            mWrapped.setColorFilter(cf);
-        }
-
-        @Override
-        public void setColorFilter(int color, PorterDuff.Mode mode) {
-            mWrapped.setColorFilter(color, mode);
-        }
-
-        @Override
-        public void clearColorFilter() {
-            mWrapped.clearColorFilter();
-        }
-
-        @Override
-        public boolean isStateful() {
-            return mWrapped.isStateful();
-        }
-
-        @Override
-        public boolean setState(int[] stateSet) {
-            return mWrapped.setState(stateSet);
-        }
-
-        @Override
-        public int[] getState() {
-            return mWrapped.getState();
-        }
-
-        @Override
-        public Drawable getCurrent() {
-            return mWrapped.getCurrent();
-        }
-
-        @Override
-        public boolean setVisible(boolean visible, boolean restart) {
-            return super.setVisible(visible, restart);
-        }
-
-        @Override
-        public int getOpacity() {
-            return mWrapped.getOpacity();
-        }
-
-        @Override
-        public Region getTransparentRegion() {
-            return mWrapped.getTransparentRegion();
-        }
-
-        @Override
-        protected boolean onStateChange(int[] state) {
-            mWrapped.setState(state);
-            return super.onStateChange(state);
-        }
-
-        @Override
-        protected void onBoundsChange(Rect bounds) {
-            super.onBoundsChange(bounds);
-            mWrapped.setBounds(bounds);
-        }
-
-        @Override
-        public int getIntrinsicWidth() {
-            return mWrapped.getIntrinsicWidth();
-        }
-
-        @Override
-        public int getIntrinsicHeight() {
-            return mWrapped.getIntrinsicHeight();
-        }
-
-        @Override
-        public int getMinimumWidth() {
-            return mWrapped.getMinimumWidth();
-        }
-
-        @Override
-        public int getMinimumHeight() {
-            return mWrapped.getMinimumHeight();
-        }
-
-        @Override
-        public boolean getPadding(Rect padding) {
-            return mWrapped.getPadding(padding);
-        }
-
-        @Override
-        public ConstantState getConstantState() {
-            return super.getConstantState();
-        }
-
-        @Override
-        public void invalidateDrawable(Drawable who) {
-            if (who == mWrapped) {
-                invalidateSelf();
-            }
-        }
-
-        @Override
-        public void scheduleDrawable(Drawable who, Runnable what, long when) {
-            if (who == mWrapped) {
-                scheduleSelf(what, when);
-            }
-        }
-
-        @Override
-        public void unscheduleDrawable(Drawable who, Runnable what) {
-            if (who == mWrapped) {
-                unscheduleSelf(what);
-            }
         }
     }
 }

@@ -26,6 +26,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Parcelable;
+import android.support.v4.util.SimpleArrayMap;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -38,7 +39,6 @@ import android.view.Window;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 /**
  * Base class for activities that want to use the support-based
@@ -120,15 +120,15 @@ public class FragmentActivity extends Activity {
 
     boolean mCheckedForLoaderManager;
     boolean mLoadersStarted;
-    HashMap<String, LoaderManagerImpl> mAllLoaderManagers;
+    SimpleArrayMap<String, LoaderManagerImpl> mAllLoaderManagers;
     LoaderManagerImpl mLoaderManager;
 
     static final class NonConfigurationInstances {
         Object activity;
         Object custom;
-        HashMap<String, Object> children;
+        SimpleArrayMap<String, Object> children;
         ArrayList<Fragment> fragments;
-        HashMap<String, LoaderManagerImpl> loaders;
+        SimpleArrayMap<String, LoaderManagerImpl> loaders;
     }
     
     static class FragmentTag {
@@ -251,6 +251,12 @@ public class FragmentActivity extends Activity {
         int id = a.getResourceId(FragmentTag.Fragment_id, View.NO_ID);
         String tag = a.getString(FragmentTag.Fragment_tag);
         a.recycle();
+
+        if (!Fragment.isSupportFragmentClass(this, fname)) {
+            // Invalid support lib fragment; let the device's framework handle it.
+            // This will allow android.app.Fragments to do the right thing.
+            return super.onCreateView(name, context, attrs);
+        }
         
         View parent = null; // NOTE: no way to get parent pre-Honeycomb.
         int containerId = parent != null ? parent.getId() : 0;
@@ -471,11 +477,18 @@ public class FragmentActivity extends Activity {
                 menu.clear();
                 onCreatePanelMenu(featureId, menu);
             }
-            boolean goforit = super.onPreparePanel(featureId, view, menu);
+            boolean goforit = onPrepareOptionsPanel(view, menu);
             goforit |= mFragments.dispatchPrepareOptionsMenu(menu);
             return goforit;
         }
         return super.onPreparePanel(featureId, view, menu);
+    }
+
+    /**
+     * @hide
+     */
+    protected boolean onPrepareOptionsPanel(View view, Menu menu) {
+        return super.onPreparePanel(Window.FEATURE_OPTIONS_PANEL, view, menu);
     }
 
     /**
@@ -496,17 +509,18 @@ public class FragmentActivity extends Activity {
         if (mAllLoaderManagers != null) {
             // prune out any loader managers that were already stopped and so
             // have nothing useful to retain.
-            LoaderManagerImpl loaders[] = new LoaderManagerImpl[mAllLoaderManagers.size()];
-            mAllLoaderManagers.values().toArray(loaders);
-            if (loaders != null) {
-                for (int i=0; i<loaders.length; i++) {
-                    LoaderManagerImpl lm = loaders[i];
-                    if (lm.mRetaining) {
-                        retainLoaders = true;
-                    } else {
-                        lm.doDestroy();
-                        mAllLoaderManagers.remove(lm.mWho);
-                    }
+            final int N = mAllLoaderManagers.size();
+            LoaderManagerImpl loaders[] = new LoaderManagerImpl[N];
+            for (int i=N-1; i>=0; i--) {
+                loaders[i] = mAllLoaderManagers.valueAt(i);
+            }
+            for (int i=0; i<N; i++) {
+                LoaderManagerImpl lm = loaders[i];
+                if (lm.mRetaining) {
+                    retainLoaders = true;
+                } else {
+                    lm.doDestroy();
+                    mAllLoaderManagers.remove(lm.mWho);
                 }
             }
         }
@@ -560,7 +574,7 @@ public class FragmentActivity extends Activity {
             if (mLoaderManager != null) {
                 mLoaderManager.doStart();
             } else if (!mCheckedForLoaderManager) {
-                mLoaderManager = getLoaderManager(null, mLoadersStarted, false);
+                mLoaderManager = getLoaderManager("(root)", mLoadersStarted, false);
                 // the returned loader manager may be a new one, so we have to start it
                 if ((mLoaderManager != null) && (!mLoaderManager.mStarted)) {
                     mLoaderManager.doStart();
@@ -572,14 +586,15 @@ public class FragmentActivity extends Activity {
         
         mFragments.dispatchStart();
         if (mAllLoaderManagers != null) {
-            LoaderManagerImpl loaders[] = new LoaderManagerImpl[mAllLoaderManagers.size()];
-            mAllLoaderManagers.values().toArray(loaders);
-            if (loaders != null) {
-                for (int i=0; i<loaders.length; i++) {
-                    LoaderManagerImpl lm = loaders[i];
-                    lm.finishRetain();
-                    lm.doReportStart();
-                }
+            final int N = mAllLoaderManagers.size();
+            LoaderManagerImpl loaders[] = new LoaderManagerImpl[N];
+            for (int i=N-1; i>=0; i--) {
+                loaders[i] = mAllLoaderManagers.valueAt(i);
+            }
+            for (int i=0; i<N; i++) {
+                LoaderManagerImpl lm = loaders[i];
+                lm.finishRetain();
+                lm.doReportStart();
             }
         }
     }
@@ -862,13 +877,13 @@ public class FragmentActivity extends Activity {
             return mLoaderManager;
         }
         mCheckedForLoaderManager = true;
-        mLoaderManager = getLoaderManager(null, mLoadersStarted, true);
+        mLoaderManager = getLoaderManager("(root)", mLoadersStarted, true);
         return mLoaderManager;
     }
     
     LoaderManagerImpl getLoaderManager(String who, boolean started, boolean create) {
         if (mAllLoaderManagers == null) {
-            mAllLoaderManagers = new HashMap<String, LoaderManagerImpl>();
+            mAllLoaderManagers = new SimpleArrayMap<String, LoaderManagerImpl>();
         }
         LoaderManagerImpl lm = mAllLoaderManagers.get(who);
         if (lm == null) {
