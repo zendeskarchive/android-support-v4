@@ -139,6 +139,13 @@ public class CursorLoader extends AsyncTaskLoader<Cursor> {
     }
 
     @Override
+    protected void onAbandon() {
+        if (mCursor != null && !mCursor.isClosed()) {
+            mCursor.unregisterContentObserver(mObserver);
+        }
+    }
+
+    @Override
     protected void onReset() {
         super.onReset();
         
