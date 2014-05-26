@@ -51,7 +51,6 @@ public class CursorLoader extends AsyncTaskLoader<Cursor> {
         if (cursor != null) {
             // Ensure the cursor window is filled
             cursor.getCount();
-            cursor.registerContentObserver(mObserver);
         }
         return cursor;
     }
@@ -68,6 +67,7 @@ public class CursorLoader extends AsyncTaskLoader<Cursor> {
         }
         Cursor oldCursor = mCursor;
         mCursor = cursor;
+        mCursor.registerContentObserver(mObserver);
 
         if (isStarted()) {
             super.deliverResult(cursor);
@@ -135,6 +135,13 @@ public class CursorLoader extends AsyncTaskLoader<Cursor> {
     public void onCanceled(Cursor cursor) {
         if (cursor != null && !cursor.isClosed()) {
             cursor.close();
+        }
+    }
+
+    @Override
+    protected void onAbandon() {
+        if (mCursor != null && !mCursor.isClosed()) {
+            mCursor.unregisterContentObserver(mObserver);
         }
     }
 
