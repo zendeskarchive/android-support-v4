@@ -67,7 +67,10 @@ public class CursorLoader extends AsyncTaskLoader<Cursor> {
         }
         Cursor oldCursor = mCursor;
         mCursor = cursor;
-        mCursor.registerContentObserver(mObserver);
+
+        if (cursor != oldCursor) {
+            mCursor.registerContentObserver(mObserver);
+        }
 
         if (isStarted()) {
             super.deliverResult(cursor);
