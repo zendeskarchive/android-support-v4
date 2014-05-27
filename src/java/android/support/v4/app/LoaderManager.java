@@ -252,7 +252,7 @@ class LoaderManagerImpl extends LoaderManager {
                mLoader = mCallbacks.onCreateLoader(mId, mArgs);
             }
             if (mLoader != null) {
-                if (mLoader.getClass().isMemberClass()
+                if ((mLoader.getClass().isMemberClass() || mLoader.getClass().isAnonymousClass())
                         && !Modifier.isStatic(mLoader.getClass().getModifiers())) {
                     throw new IllegalArgumentException(
                             "Object returned from onCreateLoader must not be a non-static inner member class: "
