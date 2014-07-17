@@ -1,0 +1,35 @@
+buildscript {
+  repositories {
+    mavenCentral()
+  }
+  dependencies {
+    classpath 'com.android.tools.build:gradle:0.12.+'
+  }
+}
+
+apply plugin: 'android-library'
+
+android {
+  compileSdkVersion 19
+  buildToolsVersion "19.1"
+
+  defaultConfig {
+    minSdkVersion 7
+    targetSdkVersion 19
+  }
+
+  sourceSets {
+    main {
+      manifest.srcFile 'AndroidManifest.xml'
+
+      def sourceDirs = ['src/eclair', 'src/eclair-mr1', 'src/froyo', 'src/gingerbread', 'src/honeycomb', 'src/honeycomb_mr2', 'src/ics', 'src/ics-mr1', 'src/java', 'src/jellybean', 'src/jellybean-mr1', 'src/jellybean-mr2', 'src/kitkat']
+
+      java.srcDirs = sourceDirs
+      resources.srcDirs = sourceDirs
+      aidl.srcDirs = sourceDirs
+      renderscript.srcDirs = sourceDirs
+      res.srcDirs = ['res']
+      assets.srcDirs = ['assets']
+    }
+  }
+}
