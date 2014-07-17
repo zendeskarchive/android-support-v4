@@ -1,0 +1,55 @@
+buildscript {
+  repositories {
+    mavenCentral()
+  }
+  dependencies {
+    classpath 'com.android.tools.build:gradle:1.0.0'
+  }
+}
+
+apply plugin: 'android-library'
+
+android {
+  compileSdkVersion 21
+  buildToolsVersion "21.1.1"
+
+  defaultConfig {
+    minSdkVersion 7
+    targetSdkVersion 21
+  }
+
+  sourceSets {
+    main {
+      manifest.srcFile 'AndroidManifest.xml'
+
+      def sourceDirs = ['src/eclair',
+                        'src/eclair-mr1',
+                        'src/donut',
+                        'src/froyo',
+                        'src/gingerbread',
+                        'src/honeycomb',
+                        'src/honeycomb_mr1',
+                        'src/honeycomb_mr2',
+                        'src/ics',
+                        'src/ics-mr1',
+                        'src/java',
+                        'src/jellybean',
+                        'src/jellybean-mr1',
+                        'src/jellybean-mr2',
+                        'src/kitkat',
+                        'src/api20',
+                        'src/api21']
+
+      java.srcDirs = sourceDirs
+      resources.srcDirs = sourceDirs
+      aidl.srcDirs = sourceDirs
+      renderscript.srcDirs = sourceDirs
+      res.srcDirs = ['res']
+      assets.srcDirs = ['assets']
+    }
+  }
+}
+
+dependencies {
+  compile 'com.android.support:support-annotations:21.0.0'
+}
