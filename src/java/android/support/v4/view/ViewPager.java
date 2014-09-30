@@ -2189,10 +2189,11 @@ public class ViewPager extends ViewGroup {
             if (!mRightEdge.isFinished()) {
                 final int restoreCount = canvas.save();
                 final int width = getWidth();
+                final int contentWidth = getWidth() - getPaddingLeft() - getPaddingRight();
                 final int height = getHeight() - getPaddingTop() - getPaddingBottom();
 
                 canvas.rotate(90);
-                canvas.translate(-getPaddingTop(), -(mLastOffset + 1) * width);
+                canvas.translate(-getPaddingTop(), -mLastOffset * contentWidth - width);
                 mRightEdge.setSize(height, width);
                 needsInvalidate |= mRightEdge.draw(canvas);
                 canvas.restoreToCount(restoreCount);
