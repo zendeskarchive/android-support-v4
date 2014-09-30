@@ -7,6 +7,9 @@ buildscript {
   }
 }
 
+group 'com.android.support'
+version '19.1.42'
+
 apply plugin: 'android-library'
 
 android {
