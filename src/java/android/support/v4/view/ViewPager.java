@@ -501,6 +501,17 @@ public class ViewPager extends ViewGroup {
         setCurrentItemInternal(item, smoothScroll, false);
     }
 
+    /**
+     * Set the currently selected page, smoothly scrolling in provided duration.
+     *
+     * @param item Item index to select
+     * @param scrollDuration Scroll duration in millis
+     */
+    public void setCurrentItem(int item, int scrollDuration) {
+        mPopulatePending = false;
+        setCurrentItemInternal(item, true, false, 0, scrollDuration);
+    }
+
     public int getCurrentItem() {
         return mCurItem;
     }
@@ -510,6 +521,10 @@ public class ViewPager extends ViewGroup {
     }
 
     void setCurrentItemInternal(int item, boolean smoothScroll, boolean always, int velocity) {
+        setCurrentItemInternal(item, smoothScroll, always, velocity, -1);
+    }
+
+    void setCurrentItemInternal(int item, boolean smoothScroll, boolean always, int velocity, int scrollDuration) {
         if (mAdapter == null || mAdapter.getCount() <= 0) {
             setScrollingCacheEnabled(false);
             return;
@@ -548,12 +563,17 @@ public class ViewPager extends ViewGroup {
             requestLayout();
         } else {
             populate(item);
-            scrollToItem(item, smoothScroll, velocity, dispatchSelected);
+            scrollToItem(item, smoothScroll, velocity, scrollDuration, dispatchSelected);
         }
     }
 
     private void scrollToItem(int item, boolean smoothScroll, int velocity,
             boolean dispatchSelected) {
+        scrollToItem(item, smoothScroll, velocity, -1, dispatchSelected);
+    }
+
+    private void scrollToItem(int item, boolean smoothScroll, int velocity,
+            int scrollDuration, boolean dispatchSelected) {
         final ItemInfo curInfo = infoForPosition(item);
         int destX = 0;
         if (curInfo != null) {
@@ -562,7 +582,7 @@ public class ViewPager extends ViewGroup {
                     Math.min(curInfo.offset, mLastOffset)));
         }
         if (smoothScroll) {
-            smoothScrollTo(destX, 0, velocity);
+            smoothScrollTo(destX, 0, velocity, scrollDuration);
             if (dispatchSelected && mOnPageChangeListener != null) {
                 mOnPageChangeListener.onPageSelected(item);
             }
@@ -775,7 +795,7 @@ public class ViewPager extends ViewGroup {
      * @param y the number of pixels to scroll by on the Y axis
      */
     void smoothScrollTo(int x, int y) {
-        smoothScrollTo(x, y, 0);
+        smoothScrollTo(x, y, 0, -1);
     }
 
     /**
@@ -786,6 +806,18 @@ public class ViewPager extends ViewGroup {
      * @param velocity the velocity associated with a fling, if applicable. (0 otherwise)
      */
     void smoothScrollTo(int x, int y, int velocity) {
+        smoothScrollTo(x, y, velocity, -1);
+    }
+
+    /**
+     * Like {@link View#scrollBy}, but scrolls smoothly with provided velocity, or in
+     * provided scroll duration.
+     * @param x the number of pixels to scroll by on the X axis
+     * @param y the number of pixels to scroll by on the Y axis
+     * @param velocity the velocity associated with a fling, if applicable. (0 otherwise)
+     * @param scrollDuration scroll duration in millis, if applicable. (-1 otherwise)
+     */
+    void smoothScrollTo(int x, int y, int velocity, int scrollDuration) {
         if (getChildCount() == 0) {
             // Nothing to do.
             setScrollingCacheEnabled(false);
@@ -812,15 +844,19 @@ public class ViewPager extends ViewGroup {
                 distanceInfluenceForSnapDuration(distanceRatio);
 
         int duration = 0;
-        velocity = Math.abs(velocity);
-        if (velocity > 0) {
-            duration = 4 * Math.round(1000 * Math.abs(distance / velocity));
+        if (scrollDuration != -1) {
+          duration = scrollDuration;
         } else {
+          velocity = Math.abs(velocity);
+          if (velocity > 0) {
+            duration = 4 * Math.round(1000 * Math.abs(distance / velocity));
+          } else {
             final float pageWidth = width * mAdapter.getPageWidth(mCurItem);
             final float pageDelta = (float) Math.abs(dx) / (pageWidth + mPageMargin);
             duration = (int) ((pageDelta + 1) * 100);
+          }
+          duration = Math.min(duration, MAX_SETTLE_DURATION);
         }
-        duration = Math.min(duration, MAX_SETTLE_DURATION);
 
         mScroller.startScroll(sx, sy, dx, dy, duration);
         ViewCompat.postInvalidateOnAnimation(this);
