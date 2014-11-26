@@ -17,7 +17,6 @@
 package android.support.v4.content;
 
 import android.content.Context;
-import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
 
