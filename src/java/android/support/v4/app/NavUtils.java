@@ -23,6 +23,7 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.support.annotation.Nullable;
 import android.support.v4.content.IntentCompat;
 import android.util.Log;
 
@@ -146,7 +147,7 @@ public class NavUtils {
      *
      * <p>If this method returns false the app can trivially call
      * {@link #navigateUpTo(Activity, Intent)} using the same parameters to correctly perform
-     * up navigation. If this method returns false, the app should synthesize a new task stack
+     * up navigation. If this method returns true, the app should synthesize a new task stack
      * by using {@link TaskStackBuilder} or another similar mechanism to perform up navigation.</p>
      *
      * @param sourceActivity The current activity from which the user is attempting to navigate up
@@ -274,6 +275,7 @@ public class NavUtils {
      * @return The fully qualified class name of sourceActivity's parent activity or null if
      *         it was not specified
      */
+    @Nullable
     public static String getParentActivityName(Activity sourceActivity) {
         try {
             return getParentActivityName(sourceActivity, sourceActivity.getComponentName());
@@ -292,6 +294,7 @@ public class NavUtils {
      * @return The fully qualified class name of sourceActivity's parent activity or null if
      *         it was not specified
      */
+    @Nullable
     public static String getParentActivityName(Context context, ComponentName componentName)
             throws NameNotFoundException {
         PackageManager pm = context.getPackageManager();

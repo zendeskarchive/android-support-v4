@@ -24,6 +24,7 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
+import android.support.annotation.StringRes;
 import android.support.v4.content.IntentCompat;
 import android.support.v4.view.MenuItemCompat;
 import android.text.Html;
@@ -403,7 +404,7 @@ public class ShareCompat {
          * @param resId Resource ID of the title string to use
          * @return This IntentBuilder for method chaining
          */
-        public IntentBuilder setChooserTitle(int resId) {
+        public IntentBuilder setChooserTitle(@StringRes int resId) {
             return setChooserTitle(mActivity.getText(resId));
         }
 
@@ -689,7 +690,7 @@ public class ShareCompat {
          */
         public boolean isShareIntent() {
             final String action = mIntent.getAction();
-            return action.equals(Intent.ACTION_SEND) || action.equals(Intent.ACTION_SEND_MULTIPLE);
+            return Intent.ACTION_SEND.equals(action) || Intent.ACTION_SEND_MULTIPLE.equals(action);
         }
 
         /**
@@ -701,7 +702,7 @@ public class ShareCompat {
          * @return true if the activity was started with an ACTION_SEND intent
          */
         public boolean isSingleShare() {
-            return mIntent.getAction().equals(Intent.ACTION_SEND);
+            return Intent.ACTION_SEND.equals(mIntent.getAction());
         }
 
         /**
@@ -712,7 +713,7 @@ public class ShareCompat {
          * @return true if the activity was started with an ACTION_SEND_MULTIPLE intent
          */
         public boolean isMultipleShare() {
-            return mIntent.getAction().equals(Intent.ACTION_SEND_MULTIPLE);
+            return Intent.ACTION_SEND_MULTIPLE.equals(mIntent.getAction());
         }
 
         /**
@@ -747,7 +748,7 @@ public class ShareCompat {
          */
         public String getHtmlText() {
             String result = mIntent.getStringExtra(IntentCompat.EXTRA_HTML_TEXT);
-            if (mIntent == null) {
+            if (result == null) {
                 CharSequence text = getText();
                 if (text instanceof Spanned) {
                     result = Html.toHtml((Spanned) text);

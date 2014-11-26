@@ -18,15 +18,20 @@ package android.support.v4.app;
 
 import android.content.Context;
 import android.content.res.Configuration;
+import android.content.res.TypedArray;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.support.annotation.IdRes;
+import android.support.annotation.StringRes;
 import android.support.v4.util.DebugUtils;
 import android.support.v4.util.LogWriter;
+import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
+import android.view.LayoutInflater;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
@@ -46,15 +51,18 @@ import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Static library support version of the framework's {@link android.app.FragmentManager}.
  * Used to write apps that run on platforms prior to Android 3.0.  When running
  * on Android 3.0 or above, this implementation is still used; it does not try
- * to switch to the framework's implementation.  See the framework SDK
+ * to switch to the framework's implementation.  See the framework {@link FragmentManager}
  * documentation for a class overview.
- * 
- * <p>Your activity must derive from {@link FragmentActivity} to use this.
+ *
+ * <p>Your activity must derive from {@link FragmentActivity} to use this. From such an activity,
+ * you can acquire the {@link FragmentManager} by calling
+ * {@link FragmentActivity#getSupportFragmentManager}.
  */
 public abstract class FragmentManager {
     /**
@@ -87,12 +95,14 @@ public abstract class FragmentManager {
          * Return the full bread crumb title resource identifier for the entry,
          * or 0 if it does not have one.
          */
+        @StringRes
         public int getBreadCrumbTitleRes();
 
         /**
          * Return the short bread crumb title resource identifier for the entry,
          * or 0 if it does not have one.
          */
+        @StringRes
         public int getBreadCrumbShortTitleRes();
 
         /**
@@ -161,7 +171,7 @@ public abstract class FragmentManager {
      * on the back stack associated with this ID are searched.
      * @return The fragment if found or null otherwise.
      */
-    public abstract Fragment findFragmentById(int id);
+    public abstract Fragment findFragmentById(@IdRes int id);
 
     /**
      * Finds a fragment that was identified by the given tag either when inflated
@@ -292,6 +302,14 @@ public abstract class FragmentManager {
     public abstract Fragment getFragment(Bundle bundle, String key);
 
     /**
+     * Get a list of all fragments that have been added to the fragment manager.
+     *
+     * @return The list of all fragments or null if none.
+     * @hide
+     */
+    public abstract List<Fragment> getFragments();
+
+    /**
      * Save the current instance state of the given Fragment.  This can be
      * used later when creating a new instance of the Fragment and adding
      * it to the fragment manager, to have it create itself to match the
@@ -314,6 +332,12 @@ public abstract class FragmentManager {
      * interesting state created by the fragment.
      */
     public abstract Fragment.SavedState saveFragmentInstanceState(Fragment f);
+
+    /**
+     * Returns true if the final {@link android.app.Activity#onDestroy() Activity.onDestroy()}
+     * call has been made on the FragmentManager's Activity, so this instance is now dead.
+     */
+    public abstract boolean isDestroyed();
 
     /**
      * Print the FragmentManager's state into the given stream.
@@ -375,13 +399,14 @@ final class FragmentManagerState implements Parcelable {
  * Callbacks from FragmentManagerImpl to its container.
  */
 interface FragmentContainer {
-    public View findViewById(int id);
+    public View findViewById(@IdRes int id);
+    public boolean hasView();
 }
 
 /**
  * Container for fragments associated with an activity.
  */
-final class FragmentManagerImpl extends FragmentManager {
+final class FragmentManagerImpl extends FragmentManager implements LayoutInflater.Factory {
     static boolean DEBUG = false;
     static final String TAG = "FragmentManager";
     
@@ -556,15 +581,20 @@ final class FragmentManagerImpl extends FragmentManager {
             return null;
         }
         if (index >= mActive.size()) {
-            throwException(new IllegalStateException("Fragement no longer exists for key "
+            throwException(new IllegalStateException("Fragment no longer exists for key "
                     + key + ": index " + index));
         }
         Fragment f = mActive.get(index);
         if (f == null) {
-            throwException(new IllegalStateException("Fragement no longer exists for key "
+            throwException(new IllegalStateException("Fragment no longer exists for key "
                     + key + ": index " + index));
         }
         return f;
+    }
+
+    @Override
+    public List<Fragment> getFragments() {
+        return mActive;
     }
 
     @Override
@@ -578,6 +608,11 @@ final class FragmentManagerImpl extends FragmentManager {
             return result != null ? new Fragment.SavedState(result) : null;
         }
         return null;
+    }
+
+    @Override
+    public boolean isDestroyed() {
+        return mDestroyed;
     }
 
     @Override
@@ -842,6 +877,7 @@ final class FragmentManagerImpl extends FragmentManager {
                 case Fragment.INITIALIZING:
                     if (DEBUG) Log.v(TAG, "moveto CREATED: " + f);
                     if (f.mSavedFragmentState != null) {
+                        f.mSavedFragmentState.setClassLoader(mActivity.getClassLoader());
                         f.mSavedViewState = f.mSavedFragmentState.getSparseParcelableArray(
                                 FragmentManagerImpl.VIEW_STATE_TAG);
                         f.mTarget = getFragment(f.mSavedFragmentState,
@@ -1051,7 +1087,9 @@ final class FragmentManagerImpl extends FragmentManager {
                                     makeInactive(f);
                                 } else {
                                     f.mActivity = null;
+                                    f.mParentFragment = null;
                                     f.mFragmentManager = null;
+                                    f.mChildFragmentManager = null;
                                 }
                             }
                         }
@@ -1192,7 +1230,7 @@ final class FragmentManagerImpl extends FragmentManager {
         if (!fragment.mHidden) {
             fragment.mHidden = true;
             if (fragment.mView != null) {
-                Animation anim = loadAnimation(fragment, transition, true,
+                Animation anim = loadAnimation(fragment, transition, false,
                         transitionStyle);
                 if (anim != null) {
                     fragment.mView.startAnimation(anim);
@@ -1333,12 +1371,19 @@ final class FragmentManagerImpl extends FragmentManager {
         }
     }
 
+    /**
+     * Adds an action to the queue of pending actions.
+     *
+     * @param action the action to add
+     * @param allowStateLoss whether to allow loss of state information
+     * @throws IllegalStateException if the activity has been destroyed
+     */
     public void enqueueAction(Runnable action, boolean allowStateLoss) {
         if (!allowStateLoss) {
             checkStateLoss();
         }
         synchronized (this) {
-            if (mActivity == null) {
+            if (mDestroyed || mActivity == null) {
                 throw new IllegalStateException("Activity has been destroyed");
             }
             if (mPendingActions == null) {
@@ -1490,7 +1535,10 @@ final class FragmentManagerImpl extends FragmentManager {
                 return false;
             }
             final BackStackRecord bss = mBackStack.remove(last);
-            bss.popFromBackStack(true);
+            SparseArray<Fragment> firstOutFragments = new SparseArray<Fragment>();
+            SparseArray<Fragment> lastInFragments = new SparseArray<Fragment>();
+            bss.calculateBackFragments(firstOutFragments, lastInFragments);
+            bss.popFromBackStack(true, null, firstOutFragments, lastInFragments);
             reportBackStackChanged();
         } else {
             int index = -1;
@@ -1534,9 +1582,16 @@ final class FragmentManagerImpl extends FragmentManager {
                 states.add(mBackStack.remove(i));
             }
             final int LAST = states.size()-1;
+            SparseArray<Fragment> firstOutFragments = new SparseArray<Fragment>();
+            SparseArray<Fragment> lastInFragments = new SparseArray<Fragment>();
+            for (int i=0; i<=LAST; i++) {
+                states.get(i).calculateBackFragments(firstOutFragments, lastInFragments);
+            }
+            BackStackRecord.TransitionState state = null;
             for (int i=0; i<=LAST; i++) {
                 if (DEBUG) Log.v(TAG, "Popping back stack state: " + states.get(i));
-                states.get(i).popFromBackStack(i == LAST);
+                state = states.get(i).popFromBackStack(i == LAST, state,
+                        firstOutFragments, lastInFragments);
             }
             reportBackStackChanged();
         }
@@ -1751,6 +1806,7 @@ final class FragmentManagerImpl extends FragmentManager {
                     fs.mSavedFragmentState.setClassLoader(mActivity.getClassLoader());
                     f.mSavedViewState = fs.mSavedFragmentState.getSparseParcelableArray(
                             FragmentManagerImpl.VIEW_STATE_TAG);
+                    f.mSavedFragmentState = fs.mSavedFragmentState;
                 }
             }
         }
@@ -1940,7 +1996,7 @@ final class FragmentManagerImpl extends FragmentManager {
                 }
             }
         }
-        
+
         if (mCreatedMenus != null) {
             for (int i=0; i<mCreatedMenus.size(); i++) {
                 Fragment f = mCreatedMenus.get(i);
@@ -1949,9 +2005,9 @@ final class FragmentManagerImpl extends FragmentManager {
                 }
             }
         }
-        
+
         mCreatedMenus = newMenus;
-        
+
         return show;
     }
     
@@ -2008,7 +2064,7 @@ final class FragmentManagerImpl extends FragmentManager {
             }
         }
     }
-    
+
     public static int reverseTransit(int transit) {
         int rev = 0;
         switch (transit) {
@@ -2047,5 +2103,111 @@ final class FragmentManagerImpl extends FragmentManager {
                 break;
         }
         return animAttr;
+    }
+
+    @Override
+    public View onCreateView(String name, Context context, AttributeSet attrs) {
+        if (!"fragment".equals(name)) {
+            return null;
+        }
+
+        String fname = attrs.getAttributeValue(null, "class");
+        TypedArray a =  context.obtainStyledAttributes(attrs, FragmentTag.Fragment);
+        if (fname == null) {
+            fname = a.getString(FragmentTag.Fragment_name);
+        }
+        int id = a.getResourceId(FragmentTag.Fragment_id, View.NO_ID);
+        String tag = a.getString(FragmentTag.Fragment_tag);
+        a.recycle();
+
+        if (!Fragment.isSupportFragmentClass(mActivity, fname)) {
+            // Invalid support lib fragment; let the device's framework handle it.
+            // This will allow android.app.Fragments to do the right thing.
+            return null;
+        }
+
+        View parent = null; // NOTE: no way to get parent pre-Honeycomb.
+        int containerId = parent != null ? parent.getId() : 0;
+        if (containerId == View.NO_ID && id == View.NO_ID && tag == null) {
+            throw new IllegalArgumentException(attrs.getPositionDescription()
+                    + ": Must specify unique android:id, android:tag, or have a parent with an id for " + fname);
+        }
+
+        // If we restored from a previous state, we may already have
+        // instantiated this fragment from the state and should use
+        // that instance instead of making a new one.
+        Fragment fragment = id != View.NO_ID ? findFragmentById(id) : null;
+        if (fragment == null && tag != null) {
+            fragment = findFragmentByTag(tag);
+        }
+        if (fragment == null && containerId != View.NO_ID) {
+            fragment = findFragmentById(containerId);
+        }
+
+        if (FragmentManagerImpl.DEBUG) Log.v(TAG, "onCreateView: id=0x"
+                + Integer.toHexString(id) + " fname=" + fname
+                + " existing=" + fragment);
+        if (fragment == null) {
+            fragment = Fragment.instantiate(context, fname);
+            fragment.mFromLayout = true;
+            fragment.mFragmentId = id != 0 ? id : containerId;
+            fragment.mContainerId = containerId;
+            fragment.mTag = tag;
+            fragment.mInLayout = true;
+            fragment.mFragmentManager = this;
+            fragment.onInflate(mActivity, attrs, fragment.mSavedFragmentState);
+            addFragment(fragment, true);
+
+        } else if (fragment.mInLayout) {
+            // A fragment already exists and it is not one we restored from
+            // previous state.
+            throw new IllegalArgumentException(attrs.getPositionDescription()
+                    + ": Duplicate id 0x" + Integer.toHexString(id)
+                    + ", tag " + tag + ", or parent id 0x" + Integer.toHexString(containerId)
+                    + " with another fragment for " + fname);
+        } else {
+            // This fragment was retained from a previous instance; get it
+            // going now.
+            fragment.mInLayout = true;
+            // If this fragment is newly instantiated (either right now, or
+            // from last saved state), then give it the attributes to
+            // initialize itself.
+            if (!fragment.mRetaining) {
+                fragment.onInflate(mActivity, attrs, fragment.mSavedFragmentState);
+            }
+        }
+
+        // If we haven't finished entering the CREATED state ourselves yet,
+        // push the inflated child fragment along.
+        if (mCurState < Fragment.CREATED && fragment.mFromLayout) {
+            moveToState(fragment, Fragment.CREATED, 0, 0, false);
+        } else {
+            moveToState(fragment);
+        }
+
+        if (fragment.mView == null) {
+            throw new IllegalStateException("Fragment " + fname
+                    + " did not create a view.");
+        }
+        if (id != 0) {
+            fragment.mView.setId(id);
+        }
+        if (fragment.mView.getTag() == null) {
+            fragment.mView.setTag(tag);
+        }
+        return fragment.mView;
+    }
+
+    LayoutInflater.Factory getLayoutInflaterFactory() {
+        return this;
+    }
+
+    static class FragmentTag {
+        public static final int[] Fragment = {
+                0x01010003, 0x010100d0, 0x010100d1
+        };
+        public static final int Fragment_id = 1;
+        public static final int Fragment_name = 0;
+        public static final int Fragment_tag = 2;
     }
 }
