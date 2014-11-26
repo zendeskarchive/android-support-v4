@@ -69,4 +69,20 @@ class ViewCompatJB {
     public static ViewParent getParentForAccessibility(View view) {
         return view.getParentForAccessibility();
     }
+
+    public static int getMinimumWidth(View view) {
+        return view.getMinimumWidth();
+    }
+
+    public static int getMinimumHeight(View view) {
+        return view.getMinimumHeight();
+    }
+
+    public static void requestApplyInsets(View view) {
+        view.requestFitSystemWindows();
+    }
+
+    public static boolean getFitsSystemWindows(View view) {
+        return view.getFitsSystemWindows();
+    }
 }
