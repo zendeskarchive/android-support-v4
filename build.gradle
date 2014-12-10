@@ -22,7 +22,23 @@ android {
     main {
       manifest.srcFile 'AndroidManifest.xml'
 
-      def sourceDirs = ['src/eclair', 'src/eclair-mr1', 'src/froyo', 'src/gingerbread', 'src/honeycomb', 'src/honeycomb_mr2', 'src/ics', 'src/ics-mr1', 'src/java', 'src/jellybean', 'src/jellybean-mr1', 'src/jellybean-mr2', 'src/kitkat']
+      def sourceDirs = ['src/eclair',
+                        'src/eclair-mr1',
+                        'src/donut',
+                        'src/froyo',
+                        'src/gingerbread',
+                        'src/honeycomb',
+                        'src/honeycomb_mr1',
+                        'src/honeycomb_mr2',
+                        'src/ics',
+                        'src/ics-mr1',
+                        'src/java',
+                        'src/jellybean',
+                        'src/jellybean-mr1',
+                        'src/jellybean-mr2',
+                        'src/kitkat',
+                        'src/api20',
+                        'src/api21']
 
       java.srcDirs = sourceDirs
       resources.srcDirs = sourceDirs
