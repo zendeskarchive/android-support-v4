@@ -28,7 +28,6 @@ import android.os.Parcelable;
 import android.support.annotation.NonNull;
 import android.support.v4.util.SimpleArrayMap;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -147,25 +146,11 @@ public class FragmentActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         mFragments.noteStateNotSaved();
-        int index = requestCode>>16;
-        if (index != 0) {
-            index--;
-            if (mFragments.mActive == null || index < 0 || index >= mFragments.mActive.size()) {
-                Log.w(TAG, "Activity result fragment index out of range: 0x"
-                        + Integer.toHexString(requestCode));
-                return;
-            }
-            Fragment frag = mFragments.mActive.get(index);
-            if (frag == null) {
-                Log.w(TAG, "Activity result no fragment exists for index: 0x"
-                        + Integer.toHexString(requestCode));
-            } else {
-                frag.onActivityResult(requestCode&0xffff, resultCode, data);
-            }
-            return;
+        if (requestCode>>16 != 0) {
+            getSupportFragmentManager().onActivityResult(requestCode, resultCode, data);
+        } else {
+            super.onActivityResult(requestCode, resultCode, data);
         }
-        
-        super.onActivityResult(requestCode, resultCode, data);
     }
 
     /**
@@ -829,9 +814,9 @@ public class FragmentActivity extends Activity {
         if ((requestCode&0xffff0000) != 0) {
             throw new IllegalArgumentException("Can only use lower 16 bits for requestCode");
         }
-        super.startActivityForResult(intent, ((fragment.mIndex+1)<<16) + (requestCode&0xffff));
+        super.startActivityForResult(intent, (fragment.getFragmentManager().getActivityRequestCode(fragment)<<16) + (requestCode&0xffff));
     }
-    
+
     void invalidateSupportFragment(String who) {
         //Log.v(TAG, "invalidateSupportFragment: who=" + who);
         if (mAllLoaderManagers != null) {

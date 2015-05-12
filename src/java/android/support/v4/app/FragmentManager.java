@@ -17,6 +17,7 @@
 package android.support.v4.app;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.res.TypedArray;
 import android.os.Bundle;
@@ -51,6 +52,7 @@ import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 
 /**
@@ -357,13 +359,17 @@ public abstract class FragmentManager {
     public static void enableDebugLogging(boolean enabled) {
         FragmentManagerImpl.DEBUG = enabled;
     }
+
+    abstract int getActivityRequestCode(Fragment fragment);
+    abstract void onActivityResult(int requestCode, int resultCode, Intent data);
 }
 
 final class FragmentManagerState implements Parcelable {
     FragmentState[] mActive;
     int[] mAdded;
     BackStackState[] mBackStack;
-    
+    ActivityRequest[] mPendingActivityRequests;
+
     public FragmentManagerState() {
     }
     
@@ -371,6 +377,7 @@ final class FragmentManagerState implements Parcelable {
         mActive = in.createTypedArray(FragmentState.CREATOR);
         mAdded = in.createIntArray();
         mBackStack = in.createTypedArray(BackStackState.CREATOR);
+        mPendingActivityRequests = in.createTypedArray(ActivityRequest.CREATOR);
     }
     
     public int describeContents() {
@@ -381,6 +388,7 @@ final class FragmentManagerState implements Parcelable {
         dest.writeTypedArray(mActive, flags);
         dest.writeIntArray(mAdded);
         dest.writeTypedArray(mBackStack, flags);
+        dest.writeTypedArray(mPendingActivityRequests, flags);
     }
     
     public static final Parcelable.Creator<FragmentManagerState> CREATOR
@@ -401,6 +409,47 @@ final class FragmentManagerState implements Parcelable {
 interface FragmentContainer {
     public View findViewById(@IdRes int id);
     public boolean hasView();
+}
+
+final class ActivityRequest implements Parcelable {
+    final int mFragmentIndex;
+    final int mRequestIndex;
+    final int mChildRequestIndex;
+
+    ActivityRequest(int fragmentIndex, int requestIndex, int childRequestIndex) {
+        mFragmentIndex = fragmentIndex;
+        mRequestIndex = requestIndex;
+        mChildRequestIndex = childRequestIndex;
+    }
+
+    ActivityRequest(Parcel in) {
+        mFragmentIndex = in.readInt();
+        mRequestIndex = in.readInt();
+        mChildRequestIndex = in.readInt();
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeInt(mFragmentIndex);
+        dest.writeInt(mRequestIndex);
+        dest.writeInt(mChildRequestIndex);
+    }
+
+    public static final Parcelable.Creator<ActivityRequest> CREATOR
+        = new Parcelable.Creator<ActivityRequest>() {
+        public ActivityRequest createFromParcel(Parcel in) {
+            return new ActivityRequest(in);
+        }
+
+        public ActivityRequest[] newArray(int size) {
+            return new ActivityRequest[size];
+        }
+    };
 }
 
 /**
@@ -426,7 +475,9 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
     ArrayList<Integer> mAvailIndices;
     ArrayList<BackStackRecord> mBackStack;
     ArrayList<Fragment> mCreatedMenus;
-    
+    ArrayList<ActivityRequest> mPendingActivityRequests;
+    ArrayList<Integer> mAvailRequestIndices;
+
     // Must be accessed while locked.
     ArrayList<BackStackRecord> mBackStackIndices;
     ArrayList<Integer> mAvailBackStackIndices;
@@ -741,6 +792,77 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
             writer.print(prefix); writer.print("  mAvailIndices: ");
                     writer.println(Arrays.toString(mAvailIndices.toArray()));
         }
+    }
+
+    @Override
+    int getActivityRequestCode(Fragment fragment) {
+        return getActivityRequestIndex(fragment, -1) + 1;
+    }
+
+    private int getActivityRequestIndex(Fragment fragment, int childRequestIndex) {
+        final ActivityRequest request;
+
+        if (mAvailRequestIndices == null || mAvailRequestIndices.isEmpty()) {
+            if (mPendingActivityRequests == null) {
+                mPendingActivityRequests = new ArrayList<ActivityRequest>();
+            }
+
+            if (mPendingActivityRequests.size() > 0xffff) {
+                throw new IllegalStateException("Over 0xffff pending activity requests in " + fragment);
+            }
+
+            request = new ActivityRequest(fragment.mIndex, mPendingActivityRequests.size(), childRequestIndex);
+            mPendingActivityRequests.add(request);
+        } else {
+            request = new ActivityRequest(fragment.mIndex, mAvailRequestIndices.remove(mAvailRequestIndices.size() - 1), childRequestIndex);
+            mPendingActivityRequests.set(request.mRequestIndex, request);
+        }
+
+        Fragment parent = fragment.getParentFragment();
+        if (parent != null) {
+            return parent.mFragmentManager.getActivityRequestIndex(parent, request.mRequestIndex);
+        } else {
+            return request.mRequestIndex;
+        }
+    }
+
+    @Override
+    void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (!dispatchOnActivityResult((requestCode>>16) - 1, requestCode, resultCode, data)) {
+            Log.w(TAG, "No fragment exists for requestCode: 0x" + Integer.toHexString(requestCode));
+        }
+    }
+
+    private boolean dispatchOnActivityResult(int requestIndex, int requestCode, int resultCode, Intent data) {
+        if (!checkElement(mPendingActivityRequests, requestIndex)) {
+            return false;
+        }
+
+        ActivityRequest resultRequest = mPendingActivityRequests.get(requestIndex);
+        if (!checkElement(mActive, resultRequest.mFragmentIndex)) {
+            return false;
+        }
+
+        Fragment fragment = mActive.get(resultRequest.mFragmentIndex);
+        if (resultRequest.mChildRequestIndex != -1) {
+            mPendingActivityRequests.set(requestIndex, null);
+            if (mAvailRequestIndices == null) {
+                mAvailRequestIndices = new ArrayList<Integer>();
+            }
+            mAvailRequestIndices.add(requestIndex);
+
+            return fragment.mChildFragmentManager.dispatchOnActivityResult(
+                resultRequest.mChildRequestIndex,
+                requestCode, resultCode, data
+            );
+        } else {
+            fragment.onActivityResult(requestCode, resultCode, data);
+            return true;
+        }
+    }
+
+    private boolean checkElement(ArrayList<?> list, int index) {
+        return list != null && index < list.size() && list.get(index) != null;
     }
 
     static final Interpolator DECELERATE_QUINT = new DecelerateInterpolator(2.5f);
@@ -1774,11 +1896,18 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
                 }
             }
         }
-        
+
+        // Save pending activity requests
+        ActivityRequest[] pendingActivityRequests = null;
+        if (mPendingActivityRequests != null) {
+            pendingActivityRequests = mPendingActivityRequests.toArray(new ActivityRequest[mPendingActivityRequests.size()]);
+        }
+
         FragmentManagerState fms = new FragmentManagerState();
         fms.mActive = active;
         fms.mAdded = added;
         fms.mBackStack = backStack;
+        fms.mPendingActivityRequests = pendingActivityRequests;
         return fms;
     }
     
@@ -1892,6 +2021,22 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
             }
         } else {
             mBackStack = null;
+        }
+
+        // Restore pending activity requests
+        if (fms.mPendingActivityRequests != null) {
+            mPendingActivityRequests = new ArrayList<ActivityRequest>();
+            if (mAvailRequestIndices != null) {
+                mAvailRequestIndices.clear();
+            } else {
+                mAvailRequestIndices = new ArrayList<Integer>();
+            }
+            for (int i=0; i<fms.mPendingActivityRequests.length; i++) {
+                if (fms.mPendingActivityRequests[i] == null) {
+                    mAvailRequestIndices.add(i);
+                }
+            }
+            mPendingActivityRequests = new ArrayList<ActivityRequest>(Arrays.asList(fms.mPendingActivityRequests));
         }
     }
     
