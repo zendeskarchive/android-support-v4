@@ -48,7 +48,6 @@ import android.widget.AdapterView;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
-import java.util.List;
 
 final class FragmentState implements Parcelable {
     final String mClassName;
@@ -480,14 +479,6 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
             mWho = parent.mWho + ":" + mIndex;
         } else {
             mWho = "android:fragment:" + mIndex;
-            if (mActivity != null) {
-              List<Fragment> fragments = getChildFragmentManager().getFragments();
-              if (fragments != null) {
-                for (Fragment fragment : fragments) {
-                  fragment.setIndex(fragment.mIndex, this);
-                }
-              }
-            }
         }
     }
 
