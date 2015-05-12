@@ -28,7 +28,6 @@ import android.os.Parcelable;
 import android.support.annotation.NonNull;
 import android.support.v4.util.SimpleArrayMap;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -39,8 +38,6 @@ import android.view.Window;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.LinkedList;
 
 /**
  * Base class for activities that want to use the support-based
@@ -149,19 +146,11 @@ public class FragmentActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         mFragments.noteStateNotSaved();
-        int treeIndex = requestCode>>16;
-        if (treeIndex != 0) {
-            Fragment frag = findFragmentByTreeIndex(treeIndex - 1);
-            if (frag == null) {
-                Log.w(TAG, "Activity result no fragment exists for treeIndex: 0x"
-                        + Integer.toHexString(requestCode));
-            } else {
-                frag.onActivityResult(requestCode&0xffff, resultCode, data);
-            }
-            return;
+        if (requestCode>>16 != 0) {
+            getSupportFragmentManager().onActivityResult(requestCode, resultCode, data);
+        } else {
+            super.onActivityResult(requestCode, resultCode, data);
         }
-        
-        super.onActivityResult(requestCode, resultCode, data);
     }
 
     /**
@@ -825,72 +814,9 @@ public class FragmentActivity extends Activity {
         if ((requestCode&0xffff0000) != 0) {
             throw new IllegalArgumentException("Can only use lower 16 bits for requestCode");
         }
-        super.startActivityForResult(intent, (getFragmentTreeIndex(fragment)<<16) + (requestCode&0xffff));
+        super.startActivityForResult(intent, (fragment.getFragmentManager().getActivityRequestCode(fragment)<<16) + (requestCode&0xffff));
     }
 
-    private Fragment findFragmentByTreeIndex(int treeIndex) {
-        BreadthFirstFragmentIterator iterator = new BreadthFirstFragmentIterator(this);
-
-        while (iterator.hasNext() && treeIndex > 0) {
-            iterator.next();
-            treeIndex--;
-        }
-
-        return iterator.hasNext() ? iterator.next() : null;
-    }
-
-    private int getFragmentTreeIndex(Fragment fragment) {
-        int index = 0;
-
-        BreadthFirstFragmentIterator iterator = new BreadthFirstFragmentIterator(this);
-        while (iterator.hasNext()) {
-            index++;
-            if (iterator.next() == fragment) {
-                return index;
-            }
-        }
-
-        throw new IllegalArgumentException("Fragment " + fragment + " not found");
-    }
-
-    private final static class BreadthFirstFragmentIterator implements Iterator<Fragment> {
-        private final LinkedList<Fragment> mQueue = new LinkedList<Fragment>();
-
-        BreadthFirstFragmentIterator(FragmentActivity activity) {
-            addAll(activity.mFragments);
-        }
-
-        private void addAll(FragmentManagerImpl fragments) {
-            if (fragments != null) {
-                ArrayList<Fragment> activeChildFragments = fragments.mActive;
-                if (activeChildFragments != null) {
-                    for (Fragment fragment : activeChildFragments) {
-                        if (fragment != null) {
-                            mQueue.add(fragment);
-                        }
-                    }
-                }
-            }
-        }
-
-        @Override
-        public boolean hasNext() {
-            return !mQueue.isEmpty();
-        }
-
-        @Override
-        public Fragment next() {
-            Fragment fragment = mQueue.remove();
-            addAll(fragment.mChildFragmentManager);
-            return fragment;
-        }
-
-        @Override
-        public void remove() {
-            throw new UnsupportedOperationException();
-        }
-    }
-    
     void invalidateSupportFragment(String who) {
         //Log.v(TAG, "invalidateSupportFragment: who=" + who);
         if (mAllLoaderManagers != null) {
