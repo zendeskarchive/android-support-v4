@@ -484,7 +484,9 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
               List<Fragment> fragments = getChildFragmentManager().getFragments();
               if (fragments != null) {
                 for (Fragment fragment : fragments) {
-                  fragment.setIndex(fragment.mIndex, this);
+                  if (fragment != null) {
+                    fragment.setIndex(fragment.mIndex, this);
+                  }
                 }
               }
             }
