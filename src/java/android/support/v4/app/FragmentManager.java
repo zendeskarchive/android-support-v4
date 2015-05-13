@@ -828,7 +828,7 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
 
     @Override
     void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (!dispatchOnActivityResult((requestCode>>16) - 1, requestCode, resultCode, data)) {
+        if (!dispatchOnActivityResult((requestCode>>16) - 1, requestCode&0xffff, resultCode, data)) {
             Log.w(TAG, "No fragment exists for requestCode: 0x" + Integer.toHexString(requestCode));
         }
     }
