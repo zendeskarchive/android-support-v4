@@ -1,0 +1,21 @@
+local.properties
+.settings
+.project
+bin
+gen
+
+#IntelliJ IDEA
+.idea
+*.iml
+*.ipr
+*.iws
+classes
+gen-external-apklibs
+
+#OSX
+.DS_Store
+
+#Emacs
+*~
+
+build
