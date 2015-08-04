@@ -16,6 +16,7 @@
 
 package android.support.v4.view.accessibility;
 
+import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
 
@@ -30,10 +31,8 @@ class AccessibilityNodeInfoCompatApi21 {
         return (List<Object>) result;
     }
 
-    static void addAction(Object info, int id, CharSequence label) {
-        AccessibilityNodeInfo.AccessibilityAction aa =
-                new AccessibilityNodeInfo.AccessibilityAction(id, label);
-        ((AccessibilityNodeInfo) info).addAction(aa);
+    static void addAction(Object info, Object action) {
+        ((AccessibilityNodeInfo) info).addAction((AccessibilityAction) action);
     }
 
     public static Object obtainCollectionInfo(int rowCount, int columnCount,
@@ -48,19 +47,37 @@ class AccessibilityNodeInfoCompatApi21 {
                 columnSpan, heading, selected);
     }
 
+    public static CharSequence getError(Object info) {
+        return ((AccessibilityNodeInfo) info).getError();
+    }
+
+    public static void setError(Object info, CharSequence error) {
+        ((AccessibilityNodeInfo) info).setError(error);
+    }
+
+    public static void setLabelFor(Object info, View labeled) {
+        ((AccessibilityNodeInfo) info).setLabelFor(labeled);
+    }
+
+    public static void setLabelFor(Object info, View root, int virtualDescendantId) {
+        ((AccessibilityNodeInfo) info).setLabelFor(root, virtualDescendantId);
+    }
+
     static class CollectionItemInfo {
         public static boolean isSelected(Object info) {
             return ((AccessibilityNodeInfo.CollectionItemInfo) info).isSelected();
         }
     }
 
-    static class AccessibilityAction {
-        static int getId(Object action) {
-            return ((AccessibilityNodeInfo.AccessibilityAction) action).getId();
-        }
+    static Object newAccessibilityAction(int actionId, CharSequence label) {
+        return new AccessibilityAction(actionId, label);
+    }
 
-        static CharSequence getLabel(Object action) {
-            return ((AccessibilityNodeInfo.AccessibilityAction) action).getLabel();
-        }
+    static int getAccessibilityActionId(Object action) {
+        return ((AccessibilityNodeInfo.AccessibilityAction) action).getId();
+    }
+
+    static CharSequence getAccessibilityActionLabel(Object action) {
+        return ((AccessibilityNodeInfo.AccessibilityAction) action).getLabel();
     }
 }
