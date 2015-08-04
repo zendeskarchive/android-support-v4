@@ -21,11 +21,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.res.Resources;
-import android.content.res.TypedArray;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Parcelable;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.v4.util.SimpleArrayMap;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -38,7 +40,6 @@ import android.view.Window;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 /**
  * Base class for activities that want to use the support-based
@@ -50,11 +51,16 @@ import java.util.HashMap;
  * and {@link #getSupportLoaderManager()} methods respectively to access
  * those features.
  *
+ * <p class="note"><strong>Note:</strong> If you want to implement an activity that includes
+ * an <a href="{@docRoot}guide/topics/ui/actionbar.html">action bar</a>, you should instead use
+ * the {@link android.support.v7.app.ActionBarActivity} class, which is a subclass of this one,
+ * so allows you to use {@link android.support.v4.app.Fragment} APIs on API level 7 and higher.</p>
+ *
  * <p>Known limitations:</p>
  * <ul>
- * <li> <p>When using the &lt;fragment> tag, this implementation can not
+ * <li> <p>When using the <code>&lt;fragment></code> tag, this implementation can not
  * use the parent view's ID as the new fragment's ID.  You must explicitly
- * specify an ID (or tag) in the &lt;fragment>.</p>
+ * specify an ID (or tag) in the <code>&lt;fragment></code>.</p>
  * <li> <p>Prior to Honeycomb (3.0), an activity's state was saved before pausing.
  * Fragments are a significant amount of new state, and dynamic enough that one
  * often wants them to change between pausing and stopping.  These classes
@@ -100,8 +106,15 @@ public class FragmentActivity extends Activity {
     final FragmentManagerImpl mFragments = new FragmentManagerImpl();
     final FragmentContainer mContainer = new FragmentContainer() {
         @Override
+        @Nullable
         public View findViewById(int id) {
             return FragmentActivity.this.findViewById(id);
+        }
+
+        @Override
+        public boolean hasView() {
+            Window window = FragmentActivity.this.getWindow();
+            return (window != null && window.peekDecorView() != null);
         }
     };
     
@@ -115,24 +128,15 @@ public class FragmentActivity extends Activity {
 
     boolean mCheckedForLoaderManager;
     boolean mLoadersStarted;
-    HashMap<String, LoaderManagerImpl> mAllLoaderManagers;
+    SimpleArrayMap<String, LoaderManagerImpl> mAllLoaderManagers;
     LoaderManagerImpl mLoaderManager;
-    
+
     static final class NonConfigurationInstances {
         Object activity;
         Object custom;
-        HashMap<String, Object> children;
+        SimpleArrayMap<String, Object> children;
         ArrayList<Fragment> fragments;
-        HashMap<String, LoaderManagerImpl> loaders;
-    }
-    
-    static class FragmentTag {
-        public static final int[] Fragment = {
-            0x01010003, 0x010100d0, 0x010100d1
-        };
-        public static final int Fragment_id = 1;
-        public static final int Fragment_name = 0;
-        public static final int Fragment_tag = 2;
+        SimpleArrayMap<String, LoaderManagerImpl> loaders;
     }
     
     // ------------------------------------------------------------------------
@@ -172,8 +176,62 @@ public class FragmentActivity extends Activity {
      */
     public void onBackPressed() {
         if (!mFragments.popBackStackImmediate()) {
-            finish();
+            supportFinishAfterTransition();
         }
+    }
+
+    /**
+     * Reverses the Activity Scene entry Transition and triggers the calling Activity
+     * to reverse its exit Transition. When the exit Transition completes,
+     * {@link #finish()} is called. If no entry Transition was used, finish() is called
+     * immediately and the Activity exit Transition is run.
+     *
+     * <p>On Android 4.4 or lower, this method only finishes the Activity with no
+     * special exit transition.</p>
+     */
+    public void supportFinishAfterTransition() {
+        ActivityCompat.finishAfterTransition(this);
+    }
+
+    /**
+     * When {@link android.app.ActivityOptions#makeSceneTransitionAnimation(Activity,
+     * android.view.View, String)} was used to start an Activity, <var>callback</var>
+     * will be called to handle shared elements on the <i>launched</i> Activity. This requires
+     * {@link Window#FEATURE_CONTENT_TRANSITIONS}.
+     *
+     * @param callback Used to manipulate shared element transitions on the launched Activity.
+     */
+    public void setEnterSharedElementCallback(SharedElementCallback callback) {
+        ActivityCompat.setEnterSharedElementCallback(this, callback);
+    }
+
+    /**
+     * When {@link android.app.ActivityOptions#makeSceneTransitionAnimation(Activity,
+     * android.view.View, String)} was used to start an Activity, <var>listener</var>
+     * will be called to handle shared elements on the <i>launching</i> Activity. Most
+     * calls will only come when returning from the started Activity.
+     * This requires {@link Window#FEATURE_CONTENT_TRANSITIONS}.
+     *
+     * @param listener Used to manipulate shared element transitions on the launching Activity.
+     */
+    public void setExitSharedElementCallback(SharedElementCallback listener) {
+        ActivityCompat.setExitSharedElementCallback(this, listener);
+    }
+
+    /**
+     * Support library version of {@link android.app.Activity#postponeEnterTransition()} that works
+     * only on API 21 and later.
+     */
+    public void supportPostponeEnterTransition() {
+        ActivityCompat.postponeEnterTransition(this);
+    }
+
+    /**
+     * Support library version of {@link android.app.Activity#startPostponedEnterTransition()}
+     * that only works with API 21 and later.
+     */
+    public void supportStartPostponedEnterTransition() {
+        ActivityCompat.startPostponedEnterTransition(this);
     }
 
     /**
@@ -189,7 +247,7 @@ public class FragmentActivity extends Activity {
      * Perform initialization of all fragments and loaders.
      */
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         mFragments.attachActivity(this, mContainer, null);
         // Old versions of the platform didn't do this!
         if (getLayoutInflater().getFactory() == null) {
@@ -233,83 +291,17 @@ public class FragmentActivity extends Activity {
      * Add support for inflating the &lt;fragment> tag.
      */
     @Override
-    public View onCreateView(String name, Context context, AttributeSet attrs) {
+    @Nullable
+    public View onCreateView(String name, @NonNull Context context, @NonNull AttributeSet attrs) {
         if (!"fragment".equals(name)) {
             return super.onCreateView(name, context, attrs);
         }
-        
-        String fname = attrs.getAttributeValue(null, "class");
-        TypedArray a =  context.obtainStyledAttributes(attrs, FragmentTag.Fragment);
-        if (fname == null) {
-            fname = a.getString(FragmentTag.Fragment_name);
-        }
-        int id = a.getResourceId(FragmentTag.Fragment_id, View.NO_ID);
-        String tag = a.getString(FragmentTag.Fragment_tag);
-        a.recycle();
-        
-        View parent = null; // NOTE: no way to get parent pre-Honeycomb.
-        int containerId = parent != null ? parent.getId() : 0;
-        if (containerId == View.NO_ID && id == View.NO_ID && tag == null) {
-            throw new IllegalArgumentException(attrs.getPositionDescription()
-                    + ": Must specify unique android:id, android:tag, or have a parent with an id for " + fname);
-        }
 
-        // If we restored from a previous state, we may already have
-        // instantiated this fragment from the state and should use
-        // that instance instead of making a new one.
-        Fragment fragment = id != View.NO_ID ? mFragments.findFragmentById(id) : null;
-        if (fragment == null && tag != null) {
-            fragment = mFragments.findFragmentByTag(tag);
+        final View v = mFragments.onCreateView(null, name, context, attrs);
+        if (v == null) {
+            return super.onCreateView(name, context, attrs);
         }
-        if (fragment == null && containerId != View.NO_ID) {
-            fragment = mFragments.findFragmentById(containerId);
-        }
-
-        if (FragmentManagerImpl.DEBUG) Log.v(TAG, "onCreateView: id=0x"
-                + Integer.toHexString(id) + " fname=" + fname
-                + " existing=" + fragment);
-        if (fragment == null) {
-            fragment = Fragment.instantiate(this, fname);
-            fragment.mFromLayout = true;
-            fragment.mFragmentId = id != 0 ? id : containerId;
-            fragment.mContainerId = containerId;
-            fragment.mTag = tag;
-            fragment.mInLayout = true;
-            fragment.mFragmentManager = mFragments;
-            fragment.onInflate(this, attrs, fragment.mSavedFragmentState);
-            mFragments.addFragment(fragment, true);
-
-        } else if (fragment.mInLayout) {
-            // A fragment already exists and it is not one we restored from
-            // previous state.
-            throw new IllegalArgumentException(attrs.getPositionDescription()
-                    + ": Duplicate id 0x" + Integer.toHexString(id)
-                    + ", tag " + tag + ", or parent id 0x" + Integer.toHexString(containerId)
-                    + " with another fragment for " + fname);
-        } else {
-            // This fragment was retained from a previous instance; get it
-            // going now.
-            fragment.mInLayout = true;
-            // If this fragment is newly instantiated (either right now, or
-            // from last saved state), then give it the attributes to
-            // initialize itself.
-            if (!fragment.mRetaining) {
-                fragment.onInflate(this, attrs, fragment.mSavedFragmentState);
-            }
-            mFragments.moveToState(fragment);
-        }
-
-        if (fragment.mView == null) {
-            throw new IllegalStateException("Fragment " + fname
-                    + " did not create a view.");
-        }
-        if (id != 0) {
-            fragment.mView.setId(id);
-        }
-        if (fragment.mView.getTag() == null) {
-            fragment.mView.setTag(tag);
-        }
-        return fragment.mView;
+        return v;
     }
 
     /**
@@ -466,11 +458,18 @@ public class FragmentActivity extends Activity {
                 menu.clear();
                 onCreatePanelMenu(featureId, menu);
             }
-            boolean goforit = super.onPreparePanel(featureId, view, menu);
+            boolean goforit = onPrepareOptionsPanel(view, menu);
             goforit |= mFragments.dispatchPrepareOptionsMenu(menu);
-            return goforit && menu.hasVisibleItems();
+            return goforit;
         }
         return super.onPreparePanel(featureId, view, menu);
+    }
+
+    /**
+     * @hide
+     */
+    protected boolean onPrepareOptionsPanel(View view, Menu menu) {
+        return super.onPreparePanel(Window.FEATURE_OPTIONS_PANEL, view, menu);
     }
 
     /**
@@ -491,17 +490,18 @@ public class FragmentActivity extends Activity {
         if (mAllLoaderManagers != null) {
             // prune out any loader managers that were already stopped and so
             // have nothing useful to retain.
-            LoaderManagerImpl loaders[] = new LoaderManagerImpl[mAllLoaderManagers.size()];
-            mAllLoaderManagers.values().toArray(loaders);
-            if (loaders != null) {
-                for (int i=0; i<loaders.length; i++) {
-                    LoaderManagerImpl lm = loaders[i];
-                    if (lm.mRetaining) {
-                        retainLoaders = true;
-                    } else {
-                        lm.doDestroy();
-                        mAllLoaderManagers.remove(lm.mWho);
-                    }
+            final int N = mAllLoaderManagers.size();
+            LoaderManagerImpl loaders[] = new LoaderManagerImpl[N];
+            for (int i=N-1; i>=0; i--) {
+                loaders[i] = mAllLoaderManagers.valueAt(i);
+            }
+            for (int i=0; i<N; i++) {
+                LoaderManagerImpl lm = loaders[i];
+                if (lm.mRetaining) {
+                    retainLoaders = true;
+                } else {
+                    lm.doDestroy();
+                    mAllLoaderManagers.remove(lm.mWho);
                 }
             }
         }
@@ -555,7 +555,7 @@ public class FragmentActivity extends Activity {
             if (mLoaderManager != null) {
                 mLoaderManager.doStart();
             } else if (!mCheckedForLoaderManager) {
-                mLoaderManager = getLoaderManager(null, mLoadersStarted, false);
+                mLoaderManager = getLoaderManager("(root)", mLoadersStarted, false);
                 // the returned loader manager may be a new one, so we have to start it
                 if ((mLoaderManager != null) && (!mLoaderManager.mStarted)) {
                     mLoaderManager.doStart();
@@ -567,14 +567,15 @@ public class FragmentActivity extends Activity {
         
         mFragments.dispatchStart();
         if (mAllLoaderManagers != null) {
-            LoaderManagerImpl loaders[] = new LoaderManagerImpl[mAllLoaderManagers.size()];
-            mAllLoaderManagers.values().toArray(loaders);
-            if (loaders != null) {
-                for (int i=0; i<loaders.length; i++) {
-                    LoaderManagerImpl lm = loaders[i];
-                    lm.finishRetain();
-                    lm.doReportStart();
-                }
+            final int N = mAllLoaderManagers.size();
+            LoaderManagerImpl loaders[] = new LoaderManagerImpl[N];
+            for (int i=N-1; i>=0; i--) {
+                loaders[i] = mAllLoaderManagers.valueAt(i);
+            }
+            for (int i=0; i<N; i++) {
+                LoaderManagerImpl lm = loaders[i];
+                lm.finishRetain();
+                lm.doReportStart();
             }
         }
     }
@@ -615,7 +616,9 @@ public class FragmentActivity extends Activity {
     }
 
     /**
-     * Invalidate the activity's options menu. This will cause relevant presentations
+     * Support library version of {@link Activity#invalidateOptionsMenu}.
+     *
+     * <p>Invalidate the activity's options menu. This will cause relevant presentations
      * of the menu to fully update via calls to onCreateOptionsMenu and
      * onPrepareOptionsMenu the next time the menu is requested.
      */
@@ -631,7 +634,7 @@ public class FragmentActivity extends Activity {
         // the options menu the next time it is prepared.
         mOptionsMenuInvalidated = true;
     }
-    
+
     /**
      * Print the Activity's state into the given stream.  This gets invoked if
      * you run "adb shell dumpsys activity <activity_component_name>".
@@ -855,13 +858,13 @@ public class FragmentActivity extends Activity {
             return mLoaderManager;
         }
         mCheckedForLoaderManager = true;
-        mLoaderManager = getLoaderManager(null, mLoadersStarted, true);
+        mLoaderManager = getLoaderManager("(root)", mLoadersStarted, true);
         return mLoaderManager;
     }
     
     LoaderManagerImpl getLoaderManager(String who, boolean started, boolean create) {
         if (mAllLoaderManagers == null) {
-            mAllLoaderManagers = new HashMap<String, LoaderManagerImpl>();
+            mAllLoaderManagers = new SimpleArrayMap<String, LoaderManagerImpl>();
         }
         LoaderManagerImpl lm = mAllLoaderManagers.get(who);
         if (lm == null) {

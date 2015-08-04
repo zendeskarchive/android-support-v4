@@ -1,5 +1,6 @@
 local.properties
 .settings
+.project
 bin
 gen
 
@@ -16,3 +17,5 @@ gen-external-apklibs
 
 #Emacs
 *~
+
+build
