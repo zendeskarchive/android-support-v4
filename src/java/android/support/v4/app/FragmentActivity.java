@@ -26,8 +26,10 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.Parcelable;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.util.SimpleArrayMap;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -104,6 +106,7 @@ public class FragmentActivity extends Activity {
     final FragmentManagerImpl mFragments = new FragmentManagerImpl();
     final FragmentContainer mContainer = new FragmentContainer() {
         @Override
+        @Nullable
         public View findViewById(int id) {
             return FragmentActivity.this.findViewById(id);
         }
@@ -146,11 +149,25 @@ public class FragmentActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         mFragments.noteStateNotSaved();
-        if (requestCode>>16 != 0) {
-            getSupportFragmentManager().onActivityResult(requestCode, resultCode, data);
-        } else {
-            super.onActivityResult(requestCode, resultCode, data);
+        int index = requestCode>>16;
+        if (index != 0) {
+            index--;
+            if (mFragments.mActive == null || index < 0 || index >= mFragments.mActive.size()) {
+                Log.w(TAG, "Activity result fragment index out of range: 0x"
+                        + Integer.toHexString(requestCode));
+                return;
+            }
+            Fragment frag = mFragments.mActive.get(index);
+            if (frag == null) {
+                Log.w(TAG, "Activity result no fragment exists for index: 0x"
+                        + Integer.toHexString(requestCode));
+            } else {
+                frag.onActivityResult(requestCode&0xffff, resultCode, data);
+            }
+            return;
         }
+        
+        super.onActivityResult(requestCode, resultCode, data);
     }
 
     /**
@@ -230,7 +247,7 @@ public class FragmentActivity extends Activity {
      * Perform initialization of all fragments and loaders.
      */
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         mFragments.attachActivity(this, mContainer, null);
         // Old versions of the platform didn't do this!
         if (getLayoutInflater().getFactory() == null) {
@@ -274,12 +291,13 @@ public class FragmentActivity extends Activity {
      * Add support for inflating the &lt;fragment> tag.
      */
     @Override
+    @Nullable
     public View onCreateView(String name, @NonNull Context context, @NonNull AttributeSet attrs) {
         if (!"fragment".equals(name)) {
             return super.onCreateView(name, context, attrs);
         }
 
-        final View v = mFragments.onCreateView(name, context, attrs);
+        final View v = mFragments.onCreateView(null, name, context, attrs);
         if (v == null) {
             return super.onCreateView(name, context, attrs);
         }
@@ -814,9 +832,9 @@ public class FragmentActivity extends Activity {
         if ((requestCode&0xffff0000) != 0) {
             throw new IllegalArgumentException("Can only use lower 16 bits for requestCode");
         }
-        super.startActivityForResult(intent, (fragment.getFragmentManager().getActivityRequestCode(fragment)<<16) + (requestCode&0xffff));
+        super.startActivityForResult(intent, ((fragment.mIndex+1)<<16) + (requestCode&0xffff));
     }
-
+    
     void invalidateSupportFragment(String who) {
         //Log.v(TAG, "invalidateSupportFragment: who=" + who);
         if (mAllLoaderManagers != null) {

@@ -261,6 +261,7 @@ public class DrawerLayout extends ViewGroup implements DrawerLayoutImpl {
         void dispatchChildInsets(View child, Object insets, int drawerGravity);
         void applyMarginInsets(MarginLayoutParams lp, Object insets, int drawerGravity);
         int getTopInset(Object lastInsets);
+        Drawable getDefaultStatusBarBackground(Context context);
     }
 
     static class DrawerLayoutCompatImplBase implements DrawerLayoutCompatImpl {
@@ -279,6 +280,11 @@ public class DrawerLayout extends ViewGroup implements DrawerLayoutImpl {
         public int getTopInset(Object insets) {
             return 0;
         }
+
+        @Override
+        public Drawable getDefaultStatusBarBackground(Context context) {
+            return null;
+        }
     }
 
     static class DrawerLayoutCompatImplApi21 implements DrawerLayoutCompatImpl {
@@ -296,6 +302,11 @@ public class DrawerLayout extends ViewGroup implements DrawerLayoutImpl {
 
         public int getTopInset(Object insets) {
             return DrawerLayoutCompatApi21.getTopInset(insets);
+        }
+
+        @Override
+        public Drawable getDefaultStatusBarBackground(Context context) {
+            return DrawerLayoutCompatApi21.getDefaultStatusBarBackground(context);
         }
     }
 
@@ -348,6 +359,7 @@ public class DrawerLayout extends ViewGroup implements DrawerLayoutImpl {
         ViewGroupCompat.setMotionEventSplittingEnabled(this, false);
         if (ViewCompat.getFitsSystemWindows(this)) {
             IMPL.configureApplyInsets(this);
+            mStatusBarBackground = IMPL.getDefaultStatusBarBackground(context);
         }
     }
 
@@ -657,6 +669,11 @@ public class DrawerLayout extends ViewGroup implements DrawerLayoutImpl {
             }
 
             updateChildrenImportantForAccessibility(drawerView, true);
+
+            // Only send WINDOW_STATE_CHANGE if the host has window focus.
+            if (hasWindowFocus()) {
+                sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED);
+            }
 
             drawerView.requestFocus();
         }
@@ -995,6 +1012,16 @@ public class DrawerLayout extends ViewGroup implements DrawerLayoutImpl {
      */
     public void setStatusBarBackground(Drawable bg) {
         mStatusBarBackground = bg;
+        invalidate();
+    }
+
+    /**
+     * Gets the drawable used to draw in the insets area for the status bar.
+     *
+     * @return The status bar background drawable, or null if none set
+     */
+    public Drawable getStatusBarBackgroundDrawable() {
+        return mStatusBarBackground;
     }
 
     /**
@@ -1005,6 +1032,7 @@ public class DrawerLayout extends ViewGroup implements DrawerLayoutImpl {
      */
     public void setStatusBarBackground(int resId) {
         mStatusBarBackground = resId != 0 ? ContextCompat.getDrawable(getContext(), resId) : null;
+        invalidate();
     }
 
     /**
@@ -1016,6 +1044,7 @@ public class DrawerLayout extends ViewGroup implements DrawerLayoutImpl {
      */
     public void setStatusBarBackgroundColor(int color) {
         mStatusBarBackground = new ColorDrawable(color);
+        invalidate();
     }
 
     @Override
@@ -1822,6 +1851,12 @@ public class DrawerLayout extends ViewGroup implements DrawerLayoutImpl {
             }
 
             info.setClassName(DrawerLayout.class.getName());
+
+            // This view reports itself as focusable so that it can intercept
+            // the back button, but we should prevent this view from reporting
+            // itself as focusable to accessibility services.
+            info.setFocusable(false);
+            info.setFocused(false);
         }
 
         @Override
