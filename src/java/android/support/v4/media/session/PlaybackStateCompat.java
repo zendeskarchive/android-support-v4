@@ -15,11 +15,17 @@
  */
 package android.support.v4.media.session;
 
+
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.SystemClock;
+import android.support.annotation.Nullable;
 import android.text.TextUtils;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Playback state for a {@link MediaSessionCompat}. This includes a state like
@@ -183,7 +189,11 @@ public final class PlaybackStateCompat implements Parcelable {
      * route. Depending on the implementation you may return to the previous
      * state when the connection finishes or enter {@link #STATE_NONE}. If
      * the connection failed {@link #STATE_ERROR} should be used.
-     * @hide
+     * <p>
+     * On devices earlier than API 21, this will appear as {@link #STATE_BUFFERING}
+     * </p>
+     *
+     * @see Builder#setState
      */
     public final static int STATE_CONNECTING = 8;
 
@@ -202,6 +212,17 @@ public final class PlaybackStateCompat implements Parcelable {
     public final static int STATE_SKIPPING_TO_NEXT = 10;
 
     /**
+     * State indicating the player is currently skipping to a specific item in
+     * the queue.
+     * <p>
+     * On devices earlier than API 21, this will appear as {@link #STATE_SKIPPING_TO_NEXT}
+     * </p>
+     *
+     * @see Builder#setState
+     */
+    public final static int STATE_SKIPPING_TO_QUEUE_ITEM = 11;
+
+    /**
      * Use this value for the position to indicate the position is not known.
      */
     public final static long PLAYBACK_POSITION_UNKNOWN = -1;
@@ -213,11 +234,16 @@ public final class PlaybackStateCompat implements Parcelable {
     private final long mActions;
     private final CharSequence mErrorMessage;
     private final long mUpdateTime;
+    private List<PlaybackStateCompat.CustomAction> mCustomActions;
+    private final long mActiveItemId;
+    private final Bundle mExtras;
 
     private Object mStateObj;
 
     private PlaybackStateCompat(int state, long position, long bufferedPosition,
-            float rate, long actions, CharSequence errorMessage, long updateTime) {
+            float rate, long actions, CharSequence errorMessage, long updateTime,
+            List<PlaybackStateCompat.CustomAction> customActions,
+            long activeItemId, Bundle extras) {
         mState = state;
         mPosition = position;
         mBufferedPosition = bufferedPosition;
@@ -225,6 +251,9 @@ public final class PlaybackStateCompat implements Parcelable {
         mActions = actions;
         mErrorMessage = errorMessage;
         mUpdateTime = updateTime;
+        mCustomActions = new ArrayList<>(customActions);
+        mActiveItemId = activeItemId;
+        mExtras = extras;
     }
 
     private PlaybackStateCompat(Parcel in) {
@@ -235,6 +264,9 @@ public final class PlaybackStateCompat implements Parcelable {
         mBufferedPosition = in.readLong();
         mActions = in.readLong();
         mErrorMessage = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(in);
+        mCustomActions = in.createTypedArrayList(CustomAction.CREATOR);
+        mActiveItemId = in.readLong();
+        mExtras = in.readBundle();
     }
 
     @Override
@@ -247,6 +279,8 @@ public final class PlaybackStateCompat implements Parcelable {
         bob.append(", updated=").append(mUpdateTime);
         bob.append(", actions=").append(mActions);
         bob.append(", error=").append(mErrorMessage);
+        bob.append(", custom actions=").append(mCustomActions);
+        bob.append(", active item id=").append(mActiveItemId);
         bob.append("}");
         return bob.toString();
     }
@@ -265,6 +299,9 @@ public final class PlaybackStateCompat implements Parcelable {
         dest.writeLong(mBufferedPosition);
         dest.writeLong(mActions);
         TextUtils.writeToParcel(mErrorMessage, dest, flags);
+        dest.writeTypedList(mCustomActions);
+        dest.writeLong(mActiveItemId);
+        dest.writeBundle(mExtras);
     }
 
     /**
@@ -278,6 +315,10 @@ public final class PlaybackStateCompat implements Parcelable {
      * <li> {@link PlaybackStateCompat#STATE_REWINDING}</li>
      * <li> {@link PlaybackStateCompat#STATE_BUFFERING}</li>
      * <li> {@link PlaybackStateCompat#STATE_ERROR}</li>
+     * <li> {@link PlaybackStateCompat#STATE_CONNECTING}</li>
+     * <li> {@link PlaybackStateCompat#STATE_SKIPPING_TO_PREVIOUS}</li>
+     * <li> {@link PlaybackStateCompat#STATE_SKIPPING_TO_NEXT}</li>
+     * <li> {@link PlaybackStateCompat#STATE_SKIPPING_TO_QUEUE_ITEM}</li>
      */
     public int getState() {
         return mState;
@@ -317,16 +358,27 @@ public final class PlaybackStateCompat implements Parcelable {
      * <li> {@link PlaybackStateCompat#ACTION_SKIP_TO_PREVIOUS}</li>
      * <li> {@link PlaybackStateCompat#ACTION_REWIND}</li>
      * <li> {@link PlaybackStateCompat#ACTION_PLAY}</li>
+     * <li> {@link PlaybackStateCompat#ACTION_PLAY_PAUSE}</li>
      * <li> {@link PlaybackStateCompat#ACTION_PAUSE}</li>
      * <li> {@link PlaybackStateCompat#ACTION_STOP}</li>
      * <li> {@link PlaybackStateCompat#ACTION_FAST_FORWARD}</li>
      * <li> {@link PlaybackStateCompat#ACTION_SKIP_TO_NEXT}</li>
      * <li> {@link PlaybackStateCompat#ACTION_SEEK_TO}</li>
      * <li> {@link PlaybackStateCompat#ACTION_SET_RATING}</li>
+     * <li> {@link PlaybackStateCompat#ACTION_PLAY_FROM_MEDIA_ID}</li>
+     * <li> {@link PlaybackStateCompat#ACTION_PLAY_FROM_SEARCH}</li>
+     * <li> {@link PlaybackStateCompat#ACTION_SKIP_TO_QUEUE_ITEM}</li>
      * </ul>
      */
     public long getActions() {
         return mActions;
+    }
+
+    /**
+     * Get the list of custom actions.
+     */
+    public List<PlaybackStateCompat.CustomAction> getCustomActions() {
+        return mCustomActions;
     }
 
     /**
@@ -348,6 +400,27 @@ public final class PlaybackStateCompat implements Parcelable {
     }
 
     /**
+     * Get the id of the currently active item in the queue. If there is no
+     * queue or a queue is not supported by the session this will be
+     * {@link MediaSessionCompat.QueueItem#UNKNOWN_ID}.
+     *
+     * @return The id of the currently active item in the queue or
+     *         {@link MediaSessionCompat.QueueItem#UNKNOWN_ID}.
+     */
+    public long getActiveQueueItemId() {
+        return mActiveItemId;
+    }
+
+    /**
+     * Get any custom extras that were set on this playback state.
+     *
+     * @return The extras for this state or null.
+     */
+    public @Nullable Bundle getExtras() {
+        return mExtras;
+    }
+
+    /**
      * Creates an instance from a framework {@link android.media.session.PlaybackState} object.
      * <p>
      * This method is only supported on API 21+.
@@ -361,6 +434,17 @@ public final class PlaybackStateCompat implements Parcelable {
             return null;
         }
 
+        List<Object> customActionObjs = PlaybackStateCompatApi21.getCustomActions(stateObj);
+        List<PlaybackStateCompat.CustomAction> customActions = null;
+        if (customActionObjs != null) {
+            customActions = new ArrayList<>(customActionObjs.size());
+            for (Object customActionObj : customActionObjs) {
+                customActions.add(CustomAction.fromCustomAction(customActionObj));
+            }
+        }
+        Bundle extras = Build.VERSION.SDK_INT >= 22
+                ? PlaybackStateCompatApi22.getExtras(stateObj)
+                : null;
         PlaybackStateCompat state = new PlaybackStateCompat(
                 PlaybackStateCompatApi21.getState(stateObj),
                 PlaybackStateCompatApi21.getPosition(stateObj),
@@ -368,7 +452,10 @@ public final class PlaybackStateCompat implements Parcelable {
                 PlaybackStateCompatApi21.getPlaybackSpeed(stateObj),
                 PlaybackStateCompatApi21.getActions(stateObj),
                 PlaybackStateCompatApi21.getErrorMessage(stateObj),
-                PlaybackStateCompatApi21.getLastPositionUpdateTime(stateObj));
+                PlaybackStateCompatApi21.getLastPositionUpdateTime(stateObj),
+                customActions,
+                PlaybackStateCompatApi21.getActiveQueueItemId(stateObj),
+                extras);
         state.mStateObj = stateObj;
         return state;
     }
@@ -386,8 +473,22 @@ public final class PlaybackStateCompat implements Parcelable {
             return mStateObj;
         }
 
-        mStateObj = PlaybackStateCompatApi21.newInstance(mState, mPosition, mBufferedPosition,
-                mSpeed, mActions, mErrorMessage, mUpdateTime);
+        List<Object> customActions = null;
+        if (mCustomActions != null) {
+            customActions = new ArrayList<>(mCustomActions.size());
+            for (PlaybackStateCompat.CustomAction customAction : mCustomActions) {
+                customActions.add(customAction.getCustomAction());
+            }
+        }
+        if (Build.VERSION.SDK_INT >= 22) {
+            mStateObj = PlaybackStateCompatApi22.newInstance(mState, mPosition, mBufferedPosition,
+                    mSpeed, mActions, mErrorMessage, mUpdateTime,
+                    customActions, mActiveItemId, mExtras);
+        } else {
+            mStateObj = PlaybackStateCompatApi21.newInstance(mState, mPosition, mBufferedPosition,
+                    mSpeed, mActions, mErrorMessage, mUpdateTime,
+                    customActions, mActiveItemId);
+        }
         return mStateObj;
     }
 
@@ -405,9 +506,228 @@ public final class PlaybackStateCompat implements Parcelable {
     };
 
     /**
+     * {@link PlaybackStateCompat.CustomAction CustomActions} can be used to
+     * extend the capabilities of the standard transport controls by exposing
+     * app specific actions to {@link MediaControllerCompat Controllers}.
+     */
+    public static final class CustomAction implements Parcelable {
+        private final String mAction;
+        private final CharSequence mName;
+        private final int mIcon;
+        private final Bundle mExtras;
+
+        private Object mCustomActionObj;
+
+        /**
+         * Use {@link PlaybackStateCompat.CustomAction.Builder#build()}.
+         */
+        private CustomAction(String action, CharSequence name, int icon, Bundle extras) {
+            mAction = action;
+            mName = name;
+            mIcon = icon;
+            mExtras = extras;
+        }
+
+        private CustomAction(Parcel in) {
+            mAction = in.readString();
+            mName = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(in);
+            mIcon = in.readInt();
+            mExtras = in.readBundle();
+        }
+
+        @Override
+        public void writeToParcel(Parcel dest, int flags) {
+            dest.writeString(mAction);
+            TextUtils.writeToParcel(mName, dest, flags);
+            dest.writeInt(mIcon);
+            dest.writeBundle(mExtras);
+        }
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        /**
+         * Creates an instance from a framework
+         * {@link android.media.session.PlaybackState.CustomAction} object.
+         * <p>
+         * This method is only supported on API 21+.
+         * </p>
+         *
+         * @param customActionObj A {@link android.media.session.PlaybackState.CustomAction} object,
+         * or null if none.
+         * @return An equivalent {@link PlaybackStateCompat.CustomAction} object, or null if none.
+         */
+        public static PlaybackStateCompat.CustomAction fromCustomAction(Object customActionObj) {
+            if (customActionObj == null || Build.VERSION.SDK_INT < 21) {
+                return null;
+            }
+
+            PlaybackStateCompat.CustomAction customAction = new PlaybackStateCompat.CustomAction(
+                    PlaybackStateCompatApi21.CustomAction.getAction(customActionObj),
+                    PlaybackStateCompatApi21.CustomAction.getName(customActionObj),
+                    PlaybackStateCompatApi21.CustomAction.getIcon(customActionObj),
+                    PlaybackStateCompatApi21.CustomAction.getExtras(customActionObj));
+            customAction.mCustomActionObj = customActionObj;
+            return customAction;
+        }
+
+        /**
+         * Gets the underlying framework {@link android.media.session.PlaybackState.CustomAction}
+         * object.
+         * <p>
+         * This method is only supported on API 21+.
+         * </p>
+         *
+         * @return An equivalent {@link android.media.session.PlaybackState.CustomAction} object,
+         * or null if none.
+         */
+        public Object getCustomAction() {
+            if (mCustomActionObj != null || Build.VERSION.SDK_INT < 21) {
+                return mCustomActionObj;
+            }
+
+            mCustomActionObj = PlaybackStateCompatApi21.CustomAction.newInstance(mAction,
+                    mName, mIcon, mExtras);
+            return mCustomActionObj;
+        }
+
+        public static final Parcelable.Creator<PlaybackStateCompat.CustomAction> CREATOR
+                = new Parcelable.Creator<PlaybackStateCompat.CustomAction>() {
+
+                    @Override
+                    public PlaybackStateCompat.CustomAction createFromParcel(Parcel p) {
+                        return new PlaybackStateCompat.CustomAction(p);
+                    }
+
+                    @Override
+                    public PlaybackStateCompat.CustomAction[] newArray(int size) {
+                        return new PlaybackStateCompat.CustomAction[size];
+                    }
+                };
+
+        /**
+         * Returns the action of the {@link CustomAction}.
+         *
+         * @return The action of the {@link CustomAction}.
+         */
+        public String getAction() {
+            return mAction;
+        }
+
+        /**
+         * Returns the display name of this action. e.g. "Favorite"
+         *
+         * @return The display name of this {@link CustomAction}.
+         */
+        public CharSequence getName() {
+            return mName;
+        }
+
+        /**
+         * Returns the resource id of the icon in the {@link MediaSessionCompat
+         * Session's} package.
+         *
+         * @return The resource id of the icon in the {@link MediaSessionCompat
+         *         Session's} package.
+         */
+        public int getIcon() {
+            return mIcon;
+        }
+
+        /**
+         * Returns extras which provide additional application-specific
+         * information about the action, or null if none. These arguments are
+         * meant to be consumed by a {@link MediaControllerCompat} if it knows
+         * how to handle them.
+         *
+         * @return Optional arguments for the {@link CustomAction}.
+         */
+        public Bundle getExtras() {
+            return mExtras;
+        }
+
+        @Override
+        public String toString() {
+            return "Action:" +
+                    "mName='" + mName +
+                    ", mIcon=" + mIcon +
+                    ", mExtras=" + mExtras;
+        }
+
+        /**
+         * Builder for {@link CustomAction} objects.
+         */
+        public static final class Builder {
+            private final String mAction;
+            private final CharSequence mName;
+            private final int mIcon;
+            private Bundle mExtras;
+
+            /**
+             * Creates a {@link CustomAction} builder with the id, name, and
+             * icon set.
+             *
+             * @param action The action of the {@link CustomAction}.
+             * @param name The display name of the {@link CustomAction}. This
+             *            name will be displayed along side the action if the UI
+             *            supports it.
+             * @param icon The icon resource id of the {@link CustomAction}.
+             *            This resource id must be in the same package as the
+             *            {@link MediaSessionCompat}. It will be displayed with
+             *            the custom action if the UI supports it.
+             */
+            public Builder(String action, CharSequence name, int icon) {
+                if (TextUtils.isEmpty(action)) {
+                    throw new IllegalArgumentException(
+                            "You must specify an action to build a CustomAction.");
+                }
+                if (TextUtils.isEmpty(name)) {
+                    throw new IllegalArgumentException(
+                            "You must specify a name to build a CustomAction.");
+                }
+                if (icon == 0) {
+                    throw new IllegalArgumentException(
+                            "You must specify an icon resource id to build a CustomAction.");
+                }
+                mAction = action;
+                mName = name;
+                mIcon = icon;
+            }
+
+            /**
+             * Set optional extras for the {@link CustomAction}. These extras
+             * are meant to be consumed by a {@link MediaControllerCompat} if it
+             * knows how to handle them. Keys should be fully qualified (e.g.
+             * "com.example.MY_ARG") to avoid collisions.
+             *
+             * @param extras Optional extras for the {@link CustomAction}.
+             * @return this.
+             */
+            public Builder setExtras(Bundle extras) {
+                mExtras = extras;
+                return this;
+            }
+
+            /**
+             * Build and return the {@link CustomAction} instance with the
+             * specified values.
+             *
+             * @return A new {@link CustomAction} instance.
+             */
+            public CustomAction build() {
+                return new CustomAction(mAction, mName, mIcon, mExtras);
+            }
+        }
+    }
+
+    /**
      * Builder for {@link PlaybackStateCompat} objects.
      */
     public static final class Builder {
+        private final List<PlaybackStateCompat.CustomAction> mCustomActions = new ArrayList<>();
+
         private int mState;
         private long mPosition;
         private long mBufferedPosition;
@@ -415,6 +735,8 @@ public final class PlaybackStateCompat implements Parcelable {
         private long mActions;
         private CharSequence mErrorMessage;
         private long mUpdateTime;
+        private long mActiveItemId = MediaSessionCompat.QueueItem.UNKNOWN_ID;
+        private Bundle mExtras;
 
         /**
          * Create an empty Builder.
@@ -436,17 +758,22 @@ public final class PlaybackStateCompat implements Parcelable {
             mBufferedPosition = source.mBufferedPosition;
             mActions = source.mActions;
             mErrorMessage = source.mErrorMessage;
+            if (source.mCustomActions != null) {
+                mCustomActions.addAll(source.mCustomActions);
+            }
+            mActiveItemId = source.mActiveItemId;
+            mExtras = source.mExtras;
         }
 
         /**
          * Set the current state of playback.
          * <p>
-         * The position must be in ms and indicates the current playback position
-         * within the track. If the position is unknown use
+         * The position must be in ms and indicates the current playback
+         * position within the track. If the position is unknown use
          * {@link #PLAYBACK_POSITION_UNKNOWN}.
          * <p>
-         * The rate is a multiple of normal playback and should be 0 when paused and
-         * negative when rewinding. Normal playback rate is 1.0.
+         * The rate is a multiple of normal playback and should be 0 when paused
+         * and negative when rewinding. Normal playback rate is 1.0.
          * <p>
          * The state must be one of the following:
          * <ul>
@@ -458,54 +785,177 @@ public final class PlaybackStateCompat implements Parcelable {
          * <li> {@link PlaybackStateCompat#STATE_REWINDING}</li>
          * <li> {@link PlaybackStateCompat#STATE_BUFFERING}</li>
          * <li> {@link PlaybackStateCompat#STATE_ERROR}</li>
+         * <li> {@link PlaybackStateCompat#STATE_CONNECTING}</li>
+         * <li> {@link PlaybackStateCompat#STATE_SKIPPING_TO_PREVIOUS}</li>
+         * <li> {@link PlaybackStateCompat#STATE_SKIPPING_TO_NEXT}</li>
+         * <li> {@link PlaybackStateCompat#STATE_SKIPPING_TO_QUEUE_ITEM}</li>
          * </ul>
          *
          * @param state The current state of playback.
          * @param position The position in the current track in ms.
-         * @param playbackRate The current rate of playback as a multiple of normal
-         *            playback.
+         * @param playbackSpeed The current rate of playback as a multiple of
+         *            normal playback.
          */
-        public void setState(int state, long position, float playbackRate) {
-            this.mState = state;
-            this.mPosition = position;
-            this.mRate = playbackRate;
-            mUpdateTime = SystemClock.elapsedRealtime();
+        public Builder setState(int state, long position, float playbackSpeed) {
+            return setState(state, position, playbackSpeed, SystemClock.elapsedRealtime());
+        }
+
+        /**
+         * Set the current state of playback.
+         * <p>
+         * The position must be in ms and indicates the current playback
+         * position within the track. If the position is unknown use
+         * {@link #PLAYBACK_POSITION_UNKNOWN}.
+         * <p>
+         * The rate is a multiple of normal playback and should be 0 when paused
+         * and negative when rewinding. Normal playback rate is 1.0.
+         * <p>
+         * The state must be one of the following:
+         * <ul>
+         * <li> {@link PlaybackStateCompat#STATE_NONE}</li>
+         * <li> {@link PlaybackStateCompat#STATE_STOPPED}</li>
+         * <li> {@link PlaybackStateCompat#STATE_PLAYING}</li>
+         * <li> {@link PlaybackStateCompat#STATE_PAUSED}</li>
+         * <li> {@link PlaybackStateCompat#STATE_FAST_FORWARDING}</li>
+         * <li> {@link PlaybackStateCompat#STATE_REWINDING}</li>
+         * <li> {@link PlaybackStateCompat#STATE_BUFFERING}</li>
+         * <li> {@link PlaybackStateCompat#STATE_ERROR}</li>
+         * <li> {@link PlaybackStateCompat#STATE_CONNECTING}</li>
+         * <li> {@link PlaybackStateCompat#STATE_SKIPPING_TO_PREVIOUS}</li>
+         * <li> {@link PlaybackStateCompat#STATE_SKIPPING_TO_NEXT}</li>
+         * <li> {@link PlaybackStateCompat#STATE_SKIPPING_TO_QUEUE_ITEM}</li>
+         * </ul>
+         *
+         * @param state The current state of playback.
+         * @param position The position in the current item in ms.
+         * @param playbackSpeed The current speed of playback as a multiple of
+         *            normal playback.
+         * @param updateTime The time in the {@link SystemClock#elapsedRealtime}
+         *            timebase that the position was updated at.
+         * @return this
+         */
+        public Builder setState(int state, long position, float playbackSpeed, long updateTime) {
+            mState = state;
+            mPosition = position;
+            mUpdateTime = updateTime;
+            mRate = playbackSpeed;
+            return this;
         }
 
         /**
          * Set the current buffered position in ms. This is the farthest
          * playback point that can be reached from the current position using
          * only buffered content.
+         *
+         * @return this
          */
-        public void setBufferedPosition(long bufferPosition) {
+        public Builder setBufferedPosition(long bufferPosition) {
             mBufferedPosition = bufferPosition;
+            return this;
         }
 
         /**
-         * Set the current capabilities available on this session. This should use a
-         * bitmask of the available capabilities.
+         * Set the current capabilities available on this session. This should
+         * use a bitmask of the available capabilities.
          * <ul>
          * <li> {@link PlaybackStateCompat#ACTION_SKIP_TO_PREVIOUS}</li>
          * <li> {@link PlaybackStateCompat#ACTION_REWIND}</li>
          * <li> {@link PlaybackStateCompat#ACTION_PLAY}</li>
+         * <li> {@link PlaybackStateCompat#ACTION_PLAY_PAUSE}</li>
          * <li> {@link PlaybackStateCompat#ACTION_PAUSE}</li>
          * <li> {@link PlaybackStateCompat#ACTION_STOP}</li>
          * <li> {@link PlaybackStateCompat#ACTION_FAST_FORWARD}</li>
          * <li> {@link PlaybackStateCompat#ACTION_SKIP_TO_NEXT}</li>
          * <li> {@link PlaybackStateCompat#ACTION_SEEK_TO}</li>
          * <li> {@link PlaybackStateCompat#ACTION_SET_RATING}</li>
+         * <li> {@link PlaybackStateCompat#ACTION_PLAY_FROM_MEDIA_ID}</li>
+         * <li> {@link PlaybackStateCompat#ACTION_PLAY_FROM_SEARCH}</li>
+         * <li> {@link PlaybackStateCompat#ACTION_SKIP_TO_QUEUE_ITEM}</li>
          * </ul>
+         *
+         * @return this
          */
-        public void setActions(long capabilities) {
+        public Builder setActions(long capabilities) {
             mActions = capabilities;
+            return this;
         }
 
         /**
-         * Set a user readable error message. This should be set when the state is
-         * {@link PlaybackStateCompat#STATE_ERROR}.
+         * Add a custom action to the playback state. Actions can be used to
+         * expose additional functionality to {@link MediaControllerCompat
+         * Controllers} beyond what is offered by the standard transport
+         * controls.
+         * <p>
+         * e.g. start a radio station based on the current item or skip ahead by
+         * 30 seconds.
+         *
+         * @param action An identifier for this action. It can be sent back to
+         *            the {@link MediaSessionCompat} through
+         *            {@link MediaControllerCompat.TransportControls#sendCustomAction(String, Bundle)}.
+         * @param name The display name for the action. If text is shown with
+         *            the action or used for accessibility, this is what should
+         *            be used.
+         * @param icon The resource action of the icon that should be displayed
+         *            for the action. The resource should be in the package of
+         *            the {@link MediaSessionCompat}.
+         * @return this
          */
-        public void setErrorMessage(CharSequence errorMessage) {
+        public Builder addCustomAction(String action, String name, int icon) {
+            return addCustomAction(new PlaybackStateCompat.CustomAction(action, name, icon, null));
+        }
+
+        /**
+         * Add a custom action to the playback state. Actions can be used to expose additional
+         * functionality to {@link MediaControllerCompat Controllers} beyond what is offered
+         * by the standard transport controls.
+         * <p>
+         * An example of an action would be to start a radio station based on the current item
+         * or to skip ahead by 30 seconds.
+         *
+         * @param customAction The custom action to add to the {@link PlaybackStateCompat}.
+         * @return this
+         */
+        public Builder addCustomAction(PlaybackStateCompat.CustomAction customAction) {
+            if (customAction == null) {
+                throw new IllegalArgumentException(
+                        "You may not add a null CustomAction to PlaybackStateCompat.");
+            }
+            mCustomActions.add(customAction);
+            return this;
+        }
+
+        /**
+         * Set the active item in the play queue by specifying its id. The
+         * default value is {@link MediaSessionCompat.QueueItem#UNKNOWN_ID}
+         *
+         * @param id The id of the active item.
+         * @return this
+         */
+        public Builder setActiveQueueItemId(long id) {
+            mActiveItemId = id;
+            return this;
+        }
+
+        /**
+         * Set a user readable error message. This should be set when the state
+         * is {@link PlaybackStateCompat#STATE_ERROR}.
+         *
+         * @return this
+         */
+        public Builder setErrorMessage(CharSequence errorMessage) {
             mErrorMessage = errorMessage;
+            return this;
+        }
+
+        /**
+         * Set any custom extras to be included with the playback state.
+         *
+         * @param extras The extras to include.
+         * @return this
+         */
+        public Builder setExtras(Bundle extras) {
+            mExtras = extras;
+            return this;
         }
 
         /**
@@ -513,7 +963,8 @@ public final class PlaybackStateCompat implements Parcelable {
          */
         public PlaybackStateCompat build() {
             return new PlaybackStateCompat(mState, mPosition, mBufferedPosition,
-                    mRate, mActions, mErrorMessage, mUpdateTime);
+                    mRate, mActions, mErrorMessage, mUpdateTime,
+                    mCustomActions, mActiveItemId, mExtras);
         }
     }
 }

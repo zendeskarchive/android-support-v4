@@ -26,6 +26,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.Parcelable;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.util.SimpleArrayMap;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
@@ -104,6 +105,7 @@ public class FragmentActivity extends Activity {
     final FragmentManagerImpl mFragments = new FragmentManagerImpl();
     final FragmentContainer mContainer = new FragmentContainer() {
         @Override
+        @Nullable
         public View findViewById(int id) {
             return FragmentActivity.this.findViewById(id);
         }
@@ -230,7 +232,7 @@ public class FragmentActivity extends Activity {
      * Perform initialization of all fragments and loaders.
      */
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         mFragments.attachActivity(this, mContainer, null);
         // Old versions of the platform didn't do this!
         if (getLayoutInflater().getFactory() == null) {
@@ -274,12 +276,13 @@ public class FragmentActivity extends Activity {
      * Add support for inflating the &lt;fragment> tag.
      */
     @Override
+    @Nullable
     public View onCreateView(String name, @NonNull Context context, @NonNull AttributeSet attrs) {
         if (!"fragment".equals(name)) {
             return super.onCreateView(name, context, attrs);
         }
 
-        final View v = mFragments.onCreateView(name, context, attrs);
+        final View v = mFragments.onCreateView(null, name, context, attrs);
         if (v == null) {
             return super.onCreateView(name, context, attrs);
         }
