@@ -16,9 +16,11 @@
 
 package android.support.v4.media.session;
 
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.media.AudioAttributes;
+import android.media.MediaDescription;
 import android.media.MediaMetadata;
 import android.media.Rating;
 import android.media.VolumeProvider;
@@ -28,6 +30,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Parcelable;
 import android.os.ResultReceiver;
+
+import java.util.ArrayList;
+import java.util.List;
 
 class MediaSessionCompatApi21 {
     public static Object createSession(Context context, String tag) {
@@ -39,6 +44,13 @@ class MediaSessionCompatApi21 {
             return mediaSession;
         }
         throw new IllegalArgumentException("mediaSession is not a valid MediaSession object");
+    }
+
+    public static Object verifyToken(Object token) {
+        if (token instanceof MediaSession.Token) {
+            return token;
+        }
+        throw new IllegalArgumentException("token is not a valid MediaSession.Token object");
     }
 
     public static Object createCallback(Callback callback) {
@@ -92,10 +104,41 @@ class MediaSessionCompatApi21 {
         ((MediaSession)sessionObj).setMetadata((MediaMetadata)metadataObj);
     }
 
+    public static void setSessionActivity(Object sessionObj, PendingIntent pi) {
+        ((MediaSession) sessionObj).setSessionActivity(pi);
+    }
+
+    public static void setMediaButtonReceiver(Object sessionObj, PendingIntent pi) {
+        ((MediaSession) sessionObj).setMediaButtonReceiver(pi);
+    }
+
+    public static void setQueue(Object sessionObj, List<Object> queueObjs) {
+        if (queueObjs == null) {
+            ((MediaSession) sessionObj).setQueue(null);
+            return;
+        }
+        ArrayList<MediaSession.QueueItem> queue = new ArrayList<MediaSession.QueueItem>();
+        for (Object itemObj : queueObjs) {
+            queue.add((MediaSession.QueueItem) itemObj);
+        }
+        ((MediaSession) sessionObj).setQueue(queue);
+    }
+
+    public static void setQueueTitle(Object sessionObj, CharSequence title) {
+        ((MediaSession) sessionObj).setQueueTitle(title);
+    }
+
+    public static void setExtras(Object sessionObj, Bundle extras) {
+        ((MediaSession) sessionObj).setExtras(extras);
+    }
+
     public static interface Callback {
         public void onCommand(String command, Bundle extras, ResultReceiver cb);
         public boolean onMediaButtonEvent(Intent mediaButtonIntent);
         public void onPlay();
+        public void onPlayFromMediaId(String mediaId, Bundle extras);
+        public void onPlayFromSearch(String search, Bundle extras);
+        public void onSkipToQueueItem(long id);
         public void onPause();
         public void onSkipToNext();
         public void onSkipToPrevious();
@@ -104,6 +147,7 @@ class MediaSessionCompatApi21 {
         public void onStop();
         public void onSeekTo(long pos);
         public void onSetRating(Object ratingObj);
+        public void onCustomAction(String action, Bundle extras);
     }
 
     static class CallbackProxy<T extends Callback> extends MediaSession.Callback {
@@ -120,12 +164,28 @@ class MediaSessionCompatApi21 {
 
         @Override
         public boolean onMediaButtonEvent(Intent mediaButtonIntent) {
-            return mCallback.onMediaButtonEvent(mediaButtonIntent);
+            return mCallback.onMediaButtonEvent(mediaButtonIntent)
+                    || super.onMediaButtonEvent(mediaButtonIntent);
         }
 
         @Override
         public void onPlay() {
             mCallback.onPlay();
+        }
+
+        @Override
+        public void onPlayFromMediaId(String mediaId, Bundle extras) {
+            mCallback.onPlayFromMediaId(mediaId, extras);
+        }
+
+        @Override
+        public void onPlayFromSearch(String search, Bundle extras) {
+            mCallback.onPlayFromSearch(search, extras);
+        }
+
+        @Override
+        public void onSkipToQueueItem(long id) {
+            mCallback.onSkipToQueueItem(id);
         }
 
         @Override
@@ -166,6 +226,26 @@ class MediaSessionCompatApi21 {
         @Override
         public void onSetRating(Rating rating) {
             mCallback.onSetRating(rating);
+        }
+
+        @Override
+        public void onCustomAction(String action, Bundle extras) {
+            mCallback.onCustomAction(action, extras);
+        }
+    }
+
+    static class QueueItem {
+
+        public static Object createItem(Object mediaDescription, long id) {
+            return new MediaSession.QueueItem((MediaDescription) mediaDescription, id);
+        }
+
+        public static Object getDescription(Object queueItem) {
+            return ((MediaSession.QueueItem) queueItem).getDescription();
+        }
+
+        public static long getQueueId(Object queueItem) {
+            return ((MediaSession.QueueItem) queueItem).getQueueId();
         }
     }
 }

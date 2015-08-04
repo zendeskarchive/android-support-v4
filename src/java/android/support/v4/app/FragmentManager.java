@@ -29,10 +29,10 @@ import android.support.annotation.IdRes;
 import android.support.annotation.StringRes;
 import android.support.v4.util.DebugUtils;
 import android.support.v4.util.LogWriter;
+import android.support.v4.view.LayoutInflaterFactory;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
-import android.view.LayoutInflater;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
@@ -455,7 +455,7 @@ final class ActivityRequest implements Parcelable {
 /**
  * Container for fragments associated with an activity.
  */
-final class FragmentManagerImpl extends FragmentManager implements LayoutInflater.Factory {
+final class FragmentManagerImpl extends FragmentManager implements LayoutInflaterFactory {
     static boolean DEBUG = false;
     static final String TAG = "FragmentManager";
     
@@ -828,7 +828,7 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
 
     @Override
     void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (!dispatchOnActivityResult((requestCode>>16) - 1, requestCode&0xffff, resultCode, data)) {
+        if (!dispatchOnActivityResult((requestCode>>16) - 1, requestCode, resultCode, data)) {
             Log.w(TAG, "No fragment exists for requestCode: 0x" + Integer.toHexString(requestCode));
         }
     }
@@ -2250,8 +2250,12 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
         return animAttr;
     }
 
+    LayoutInflaterFactory getLayoutInflaterFactory() {
+        return this;
+    }
+
     @Override
-    public View onCreateView(String name, Context context, AttributeSet attrs) {
+    public View onCreateView(View parent, String name, Context context, AttributeSet attrs) {
         if (!"fragment".equals(name)) {
             return null;
         }
@@ -2271,11 +2275,10 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
             return null;
         }
 
-        View parent = null; // NOTE: no way to get parent pre-Honeycomb.
         int containerId = parent != null ? parent.getId() : 0;
         if (containerId == View.NO_ID && id == View.NO_ID && tag == null) {
             throw new IllegalArgumentException(attrs.getPositionDescription()
-                    + ": Must specify unique android:id, android:tag, or have a parent with an id for " + fname);
+                + ": Must specify unique android:id, android:tag, or have a parent with an id for " + fname);
         }
 
         // If we restored from a previous state, we may already have
@@ -2290,8 +2293,8 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
         }
 
         if (FragmentManagerImpl.DEBUG) Log.v(TAG, "onCreateView: id=0x"
-                + Integer.toHexString(id) + " fname=" + fname
-                + " existing=" + fragment);
+            + Integer.toHexString(id) + " fname=" + fname
+            + " existing=" + fragment);
         if (fragment == null) {
             fragment = Fragment.instantiate(context, fname);
             fragment.mFromLayout = true;
@@ -2307,9 +2310,9 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
             // A fragment already exists and it is not one we restored from
             // previous state.
             throw new IllegalArgumentException(attrs.getPositionDescription()
-                    + ": Duplicate id 0x" + Integer.toHexString(id)
-                    + ", tag " + tag + ", or parent id 0x" + Integer.toHexString(containerId)
-                    + " with another fragment for " + fname);
+                + ": Duplicate id 0x" + Integer.toHexString(id)
+                + ", tag " + tag + ", or parent id 0x" + Integer.toHexString(containerId)
+                + " with another fragment for " + fname);
         } else {
             // This fragment was retained from a previous instance; get it
             // going now.
@@ -2332,7 +2335,7 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
 
         if (fragment.mView == null) {
             throw new IllegalStateException("Fragment " + fname
-                    + " did not create a view.");
+                + " did not create a view.");
         }
         if (id != 0) {
             fragment.mView.setId(id);
@@ -2341,10 +2344,7 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
             fragment.mView.setTag(tag);
         }
         return fragment.mView;
-    }
 
-    LayoutInflater.Factory getLayoutInflaterFactory() {
-        return this;
     }
 
     static class FragmentTag {
