@@ -215,6 +215,9 @@ class DrawableWrapperDonut extends Drawable implements Drawable.Callback, Drawab
                 mColorFilterSet = true;
                 return true;
             }
+        } else {
+            mColorFilterSet = false;
+            clearColorFilter();
         }
         return false;
     }

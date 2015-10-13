@@ -2,11 +2,11 @@ apply plugin: 'android-library'
 
 android {
   compileSdkVersion 22
-  buildToolsVersion "21.1.1"
+  buildToolsVersion "22.0.0"
 
   defaultConfig {
-    minSdkVersion 7
-    targetSdkVersion 22
+    minSdkVersion 4
+    targetSdkVersion 23
   }
 
   sourceSets {
@@ -31,7 +31,8 @@ android {
                         'src/api',
                         'src/api20',
                         'src/api21',
-                        'src/api22']
+                        'src/api22',
+                        'src/api23']
 
       java.srcDirs = sourceDirs
       resources.srcDirs = sourceDirs
@@ -44,6 +45,6 @@ android {
 }
 
 dependencies {
-  compile 'com.android.support:support-annotations:21.0.0'
+  compile 'com.android.support:support-annotations:23.0.1'
 }
 

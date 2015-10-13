@@ -29,6 +29,7 @@ package android.support.v4.accessibilityservice {
 package android.support.v4.animation {
 
   public abstract class AnimatorCompatHelper {
+    method public static void clearInterpolator(android.view.View);
     method public static android.support.v4.animation.ValueAnimatorCompat emptyValueAnimator();
   }
 
@@ -87,13 +88,20 @@ package android.support.v4.app {
     ctor public ActivityCompat();
     method public static void finishAffinity(android.app.Activity);
     method public static void finishAfterTransition(android.app.Activity);
+    method public android.net.Uri getReferrer(android.app.Activity);
     method public static boolean invalidateOptionsMenu(android.app.Activity);
     method public static void postponeEnterTransition(android.app.Activity);
+    method public static void requestPermissions(android.app.Activity, java.lang.String[], int);
     method public static void setEnterSharedElementCallback(android.app.Activity, android.support.v4.app.SharedElementCallback);
     method public static void setExitSharedElementCallback(android.app.Activity, android.support.v4.app.SharedElementCallback);
+    method public static boolean shouldShowRequestPermissionRationale(android.app.Activity, java.lang.String);
     method public static void startActivity(android.app.Activity, android.content.Intent, android.os.Bundle);
     method public static void startActivityForResult(android.app.Activity, android.content.Intent, int, android.os.Bundle);
     method public static void startPostponedEnterTransition(android.app.Activity);
+  }
+
+  public static abstract interface ActivityCompat.OnRequestPermissionsResultCallback {
+    method public abstract void onRequestPermissionsResult(int, java.lang.String[], int[]);
   }
 
   public final class ActivityManagerCompat {
@@ -109,6 +117,28 @@ package android.support.v4.app {
     method public static android.support.v4.app.ActivityOptionsCompat makeThumbnailScaleUpAnimation(android.view.View, android.graphics.Bitmap, int, int);
     method public android.os.Bundle toBundle();
     method public void update(android.support.v4.app.ActivityOptionsCompat);
+  }
+
+  public class AppOpsManagerCompat {
+    ctor public AppOpsManagerCompat();
+    method public static int noteOp(android.content.Context, java.lang.String, int, java.lang.String);
+    method public static int noteProxyOp(android.content.Context, java.lang.String, java.lang.String);
+    method public static java.lang.String permissionToOp(java.lang.String);
+    field public static final int MODE_ALLOWED = 0; // 0x0
+    field public static final int MODE_DEFAULT = 3; // 0x3
+    field public static final int MODE_IGNORED = 1; // 0x1
+  }
+
+   abstract class BaseFragmentActivityDonut extends android.app.Activity {
+  }
+
+   abstract class BaseFragmentActivityHoneycomb extends android.support.v4.app.BaseFragmentActivityDonut {
+  }
+
+  public class BundleCompat {
+    ctor public BundleCompat();
+    method public static android.os.IBinder getBinder(android.os.Bundle, java.lang.String);
+    method public static void putBinder(android.os.Bundle, java.lang.String, android.os.IBinder);
   }
 
   public class DialogFragment extends android.support.v4.app.Fragment implements android.content.DialogInterface.OnCancelListener android.content.DialogInterface.OnDismissListener {
@@ -142,9 +172,11 @@ package android.support.v4.app {
     method public boolean getAllowReturnTransitionOverlap();
     method public final android.os.Bundle getArguments();
     method public final android.support.v4.app.FragmentManager getChildFragmentManager();
+    method public android.content.Context getContext();
     method public java.lang.Object getEnterTransition();
     method public java.lang.Object getExitTransition();
     method public final android.support.v4.app.FragmentManager getFragmentManager();
+    method public final java.lang.Object getHost();
     method public final int getId();
     method public android.support.v4.app.LoaderManager getLoaderManager();
     method public final android.support.v4.app.Fragment getParentFragment();
@@ -174,7 +206,8 @@ package android.support.v4.app {
     method public final boolean isVisible();
     method public void onActivityCreated(android.os.Bundle);
     method public void onActivityResult(int, int, android.content.Intent);
-    method public void onAttach(android.app.Activity);
+    method public void onAttach(android.content.Context);
+    method public deprecated void onAttach(android.app.Activity);
     method public void onConfigurationChanged(android.content.res.Configuration);
     method public boolean onContextItemSelected(android.view.MenuItem);
     method public void onCreate(android.os.Bundle);
@@ -187,12 +220,14 @@ package android.support.v4.app {
     method public void onDestroyView();
     method public void onDetach();
     method public void onHiddenChanged(boolean);
-    method public void onInflate(android.app.Activity, android.util.AttributeSet, android.os.Bundle);
+    method public void onInflate(android.content.Context, android.util.AttributeSet, android.os.Bundle);
+    method public deprecated void onInflate(android.app.Activity, android.util.AttributeSet, android.os.Bundle);
     method public void onLowMemory();
     method public boolean onOptionsItemSelected(android.view.MenuItem);
     method public void onOptionsMenuClosed(android.view.Menu);
     method public void onPause();
     method public void onPrepareOptionsMenu(android.view.Menu);
+    method public void onRequestPermissionsResult(int, java.lang.String[], int[]);
     method public void onResume();
     method public void onSaveInstanceState(android.os.Bundle);
     method public void onStart();
@@ -200,6 +235,7 @@ package android.support.v4.app {
     method public void onViewCreated(android.view.View, android.os.Bundle);
     method public void onViewStateRestored(android.os.Bundle);
     method public void registerForContextMenu(android.view.View);
+    method public final void requestPermissions(java.lang.String[], int);
     method public void setAllowEnterTransitionOverlap(boolean);
     method public void setAllowReturnTransitionOverlap(boolean);
     method public void setArguments(android.os.Bundle);
@@ -217,6 +253,7 @@ package android.support.v4.app {
     method public void setSharedElementReturnTransition(java.lang.Object);
     method public void setTargetFragment(android.support.v4.app.Fragment, int);
     method public void setUserVisibleHint(boolean);
+    method public boolean shouldShowRequestPermissionRationale(java.lang.String);
     method public void startActivity(android.content.Intent);
     method public void startActivityForResult(android.content.Intent, int);
     method public void unregisterForContextMenu(android.view.View);
@@ -232,7 +269,7 @@ package android.support.v4.app {
     field public static final android.os.Parcelable.Creator<android.support.v4.app.Fragment.SavedState> CREATOR;
   }
 
-  public class FragmentActivity extends android.app.Activity {
+  public class FragmentActivity extends android.support.v4.app.BaseFragmentActivityHoneycomb implements android.support.v4.app.ActivityCompat.OnRequestPermissionsResultCallback {
     ctor public FragmentActivity();
     method public java.lang.Object getLastCustomNonConfigurationInstance();
     method public android.support.v4.app.FragmentManager getSupportFragmentManager();
@@ -248,6 +285,68 @@ package android.support.v4.app {
     method public void supportInvalidateOptionsMenu();
     method public void supportPostponeEnterTransition();
     method public void supportStartPostponedEnterTransition();
+    method public final void validateRequestPermissionsRequestCode(int);
+  }
+
+  public abstract class FragmentContainer {
+    ctor public FragmentContainer();
+    method public abstract android.view.View onFindViewById(int);
+    method public abstract boolean onHasView();
+  }
+
+  public class FragmentController {
+    method public void attachHost(android.support.v4.app.Fragment);
+    method public static final android.support.v4.app.FragmentController createController(android.support.v4.app.FragmentHostCallback<?>);
+    method public void dispatchActivityCreated();
+    method public void dispatchConfigurationChanged(android.content.res.Configuration);
+    method public boolean dispatchContextItemSelected(android.view.MenuItem);
+    method public void dispatchCreate();
+    method public boolean dispatchCreateOptionsMenu(android.view.Menu, android.view.MenuInflater);
+    method public void dispatchDestroy();
+    method public void dispatchDestroyView();
+    method public void dispatchLowMemory();
+    method public boolean dispatchOptionsItemSelected(android.view.MenuItem);
+    method public void dispatchOptionsMenuClosed(android.view.Menu);
+    method public void dispatchPause();
+    method public boolean dispatchPrepareOptionsMenu(android.view.Menu);
+    method public void dispatchReallyStop();
+    method public void dispatchResume();
+    method public void dispatchStart();
+    method public void dispatchStop();
+    method public void doLoaderDestroy();
+    method public void doLoaderRetain();
+    method public void doLoaderStart();
+    method public void doLoaderStop(boolean);
+    method public void dumpLoaders(java.lang.String, java.io.FileDescriptor, java.io.PrintWriter, java.lang.String[]);
+    method public boolean execPendingActions();
+    method public java.util.List<android.support.v4.app.Fragment> getActiveFragments(java.util.List<android.support.v4.app.Fragment>);
+    method public int getActiveFragmentsCount();
+    method public android.support.v4.app.FragmentManager getSupportFragmentManager();
+    method public android.support.v4.app.LoaderManager getSupportLoaderManager();
+    method public void noteStateNotSaved();
+    method public android.view.View onCreateView(android.view.View, java.lang.String, android.content.Context, android.util.AttributeSet);
+    method public void reportLoaderStart();
+    method public void restoreAllState(android.os.Parcelable, java.util.List<android.support.v4.app.Fragment>);
+    method public void restoreLoaderNonConfig(android.support.v4.util.SimpleArrayMap<java.lang.String, android.support.v4.app.LoaderManager>);
+    method public android.support.v4.util.SimpleArrayMap<java.lang.String, android.support.v4.app.LoaderManager> retainLoaderNonConfig();
+    method public java.util.List<android.support.v4.app.Fragment> retainNonConfig();
+    method public android.os.Parcelable saveAllState();
+  }
+
+  public abstract class FragmentHostCallback extends android.support.v4.app.FragmentContainer {
+    ctor public FragmentHostCallback(android.content.Context, android.os.Handler, int);
+    method public void onDump(java.lang.String, java.io.FileDescriptor, java.io.PrintWriter, java.lang.String[]);
+    method public android.view.View onFindViewById(int);
+    method public abstract E onGetHost();
+    method public android.view.LayoutInflater onGetLayoutInflater();
+    method public int onGetWindowAnimations();
+    method public boolean onHasView();
+    method public boolean onHasWindowAnimations();
+    method public void onRequestPermissionsFromFragment(android.support.v4.app.Fragment, java.lang.String[], int);
+    method public boolean onShouldSaveFragmentState(android.support.v4.app.Fragment);
+    method public boolean onShouldShowRequestPermissionRationale(java.lang.String);
+    method public void onStartActivityFromFragment(android.support.v4.app.Fragment, android.content.Intent, int);
+    method public void onSupportInvalidateOptionsMenu();
   }
 
   public abstract class FragmentManager {
@@ -850,16 +949,24 @@ package android.support.v4.content {
 
   public abstract class AsyncTaskLoader extends android.support.v4.content.Loader {
     ctor public AsyncTaskLoader(android.content.Context);
-    method public boolean cancelLoad();
+    method public void cancelLoadInBackground();
+    method public boolean isLoadInBackgroundCanceled();
     method public abstract D loadInBackground();
     method public void onCanceled(D);
     method protected D onLoadInBackground();
     method public void setUpdateThrottle(long);
   }
 
+  public class ContentResolverCompat {
+    method public static android.database.Cursor query(android.content.ContentResolver, android.net.Uri, java.lang.String[], java.lang.String, java.lang.String[], java.lang.String, android.support.v4.os.CancellationSignal);
+  }
+
   public class ContextCompat {
     ctor public ContextCompat();
+    method public static int checkSelfPermission(android.content.Context, java.lang.String);
     method public final java.io.File getCodeCacheDir(android.content.Context);
+    method public static final int getColor(android.content.Context, int);
+    method public static final android.content.res.ColorStateList getColorStateList(android.content.Context, int);
     method public static final android.graphics.drawable.Drawable getDrawable(android.content.Context, int);
     method public static java.io.File[] getExternalCacheDirs(android.content.Context);
     method public static java.io.File[] getExternalFilesDirs(android.content.Context, java.lang.String);
@@ -914,8 +1021,10 @@ package android.support.v4.content {
   public class Loader {
     ctor public Loader(android.content.Context);
     method public void abandon();
+    method public boolean cancelLoad();
     method public void commitContentChanged();
     method public java.lang.String dataToString(D);
+    method public void deliverCancellation();
     method public void deliverResult(D);
     method public void dump(java.lang.String, java.io.FileDescriptor, java.io.PrintWriter, java.lang.String[]);
     method public void forceLoad();
@@ -925,22 +1034,29 @@ package android.support.v4.content {
     method public boolean isReset();
     method public boolean isStarted();
     method protected void onAbandon();
+    method protected boolean onCancelLoad();
     method public void onContentChanged();
     method protected void onForceLoad();
     method protected void onReset();
     method protected void onStartLoading();
     method protected void onStopLoading();
     method public void registerListener(int, android.support.v4.content.Loader.OnLoadCompleteListener<D>);
+    method public void registerOnLoadCanceledListener(android.support.v4.content.Loader.OnLoadCanceledListener<D>);
     method public void reset();
     method public void rollbackContentChanged();
     method public final void startLoading();
     method public void stopLoading();
     method public boolean takeContentChanged();
     method public void unregisterListener(android.support.v4.content.Loader.OnLoadCompleteListener<D>);
+    method public void unregisterOnLoadCanceledListener(android.support.v4.content.Loader.OnLoadCanceledListener<D>);
   }
 
   public final class Loader.ForceLoadContentObserver extends android.database.ContentObserver {
     ctor public Loader.ForceLoadContentObserver();
+  }
+
+  public static abstract interface Loader.OnLoadCanceledListener {
+    method public abstract void onLoadCanceled(android.support.v4.content.Loader<D>);
   }
 
   public static abstract interface Loader.OnLoadCompleteListener {
@@ -953,6 +1069,28 @@ package android.support.v4.content {
     method public boolean sendBroadcast(android.content.Intent);
     method public void sendBroadcastSync(android.content.Intent);
     method public void unregisterReceiver(android.content.BroadcastReceiver);
+  }
+
+  public final class PermissionChecker {
+    method public static int checkCallingOrSelfPermission(android.content.Context, java.lang.String);
+    method public static int checkCallingPermission(android.content.Context, java.lang.String, java.lang.String);
+    method public static int checkPermission(android.content.Context, java.lang.String, int, int, java.lang.String);
+    method public static int checkSelfPermission(android.content.Context, java.lang.String);
+    field public static final int PERMISSION_DENIED = -1; // 0xffffffff
+    field public static final int PERMISSION_DENIED_APP_OP = -2; // 0xfffffffe
+    field public static final int PERMISSION_GRANTED = 0; // 0x0
+  }
+
+  public static abstract class PermissionChecker.PermissionResult implements java.lang.annotation.Annotation {
+  }
+
+  public class SharedPreferencesCompat {
+    ctor public SharedPreferencesCompat();
+  }
+
+  public static class SharedPreferencesCompat.EditorCompat {
+    method public void apply(android.content.SharedPreferences.Editor);
+    method public static android.support.v4.content.SharedPreferencesCompat.EditorCompat getInstance();
   }
 
   public abstract class WakefulBroadcastReceiver extends android.content.BroadcastReceiver {
@@ -1016,11 +1154,13 @@ package android.support.v4.graphics.drawable {
 
   public class DrawableCompat {
     ctor public DrawableCompat();
+    method public static int getLayoutDirection(android.graphics.drawable.Drawable);
     method public static boolean isAutoMirrored(android.graphics.drawable.Drawable);
     method public static void jumpToCurrentState(android.graphics.drawable.Drawable);
     method public static void setAutoMirrored(android.graphics.drawable.Drawable, boolean);
     method public static void setHotspot(android.graphics.drawable.Drawable, float, float);
     method public static void setHotspotBounds(android.graphics.drawable.Drawable, int, int, int, int);
+    method public static void setLayoutDirection(android.graphics.drawable.Drawable, int);
     method public static void setTint(android.graphics.drawable.Drawable, int);
     method public static void setTintList(android.graphics.drawable.Drawable, android.content.res.ColorStateList);
     method public static void setTintMode(android.graphics.drawable.Drawable, android.graphics.PorterDuff.Mode);
@@ -1037,8 +1177,10 @@ package android.support.v4.graphics.drawable {
     method public final android.graphics.Paint getPaint();
     method public boolean hasAntiAlias();
     method public boolean hasMipMap();
+    method public boolean isCircular();
     method public void setAlpha(int);
     method public void setAntiAlias(boolean);
+    method public void setCircular(boolean);
     method public void setColorFilter(android.graphics.ColorFilter);
     method public void setCornerRadius(float);
     method public void setGravity(int);
@@ -1069,6 +1211,39 @@ package android.support.v4.hardware.display {
 
 }
 
+package android.support.v4.hardware.fingerprint {
+
+  public class FingerprintManagerCompat {
+    method public void authenticate(android.support.v4.hardware.fingerprint.FingerprintManagerCompat.CryptoObject, int, android.support.v4.os.CancellationSignal, android.support.v4.hardware.fingerprint.FingerprintManagerCompat.AuthenticationCallback, android.os.Handler);
+    method public static android.support.v4.hardware.fingerprint.FingerprintManagerCompat from(android.content.Context);
+    method public boolean hasEnrolledFingerprints();
+    method public boolean isHardwareDetected();
+  }
+
+  public static abstract class FingerprintManagerCompat.AuthenticationCallback {
+    ctor public FingerprintManagerCompat.AuthenticationCallback();
+    method public void onAuthenticationError(int, java.lang.CharSequence);
+    method public void onAuthenticationFailed();
+    method public void onAuthenticationHelp(int, java.lang.CharSequence);
+    method public void onAuthenticationSucceeded(android.support.v4.hardware.fingerprint.FingerprintManagerCompat.AuthenticationResult);
+  }
+
+  public static final class FingerprintManagerCompat.AuthenticationResult {
+    ctor public FingerprintManagerCompat.AuthenticationResult(android.support.v4.hardware.fingerprint.FingerprintManagerCompat.CryptoObject);
+    method public android.support.v4.hardware.fingerprint.FingerprintManagerCompat.CryptoObject getCryptoObject();
+  }
+
+  public static class FingerprintManagerCompat.CryptoObject {
+    ctor public FingerprintManagerCompat.CryptoObject(java.security.Signature);
+    ctor public FingerprintManagerCompat.CryptoObject(javax.crypto.Cipher);
+    ctor public FingerprintManagerCompat.CryptoObject(javax.crypto.Mac);
+    method public javax.crypto.Cipher getCipher();
+    method public javax.crypto.Mac getMac();
+    method public java.security.Signature getSignature();
+  }
+
+}
+
 package android.support.v4.media {
 
   public final class MediaDescriptionCompat implements android.os.Parcelable {
@@ -1080,6 +1255,7 @@ package android.support.v4.media {
     method public android.net.Uri getIconUri();
     method public java.lang.Object getMediaDescription();
     method public java.lang.String getMediaId();
+    method public android.net.Uri getMediaUri();
     method public java.lang.CharSequence getSubtitle();
     method public java.lang.CharSequence getTitle();
     method public void writeToParcel(android.os.Parcel, int);
@@ -1094,6 +1270,7 @@ package android.support.v4.media {
     method public android.support.v4.media.MediaDescriptionCompat.Builder setIconBitmap(android.graphics.Bitmap);
     method public android.support.v4.media.MediaDescriptionCompat.Builder setIconUri(android.net.Uri);
     method public android.support.v4.media.MediaDescriptionCompat.Builder setMediaId(java.lang.String);
+    method public android.support.v4.media.MediaDescriptionCompat.Builder setMediaUri(android.net.Uri);
     method public android.support.v4.media.MediaDescriptionCompat.Builder setSubtitle(java.lang.CharSequence);
     method public android.support.v4.media.MediaDescriptionCompat.Builder setTitle(java.lang.CharSequence);
   }
@@ -1326,6 +1503,7 @@ package android.support.v4.media.session {
     method public abstract void play();
     method public abstract void playFromMediaId(java.lang.String, android.os.Bundle);
     method public abstract void playFromSearch(java.lang.String, android.os.Bundle);
+    method public abstract void playFromUri(android.net.Uri, android.os.Bundle);
     method public abstract void rewind();
     method public abstract void seekTo(long);
     method public abstract void sendCustomAction(android.support.v4.media.session.PlaybackStateCompat.CustomAction, android.os.Bundle);
@@ -1377,6 +1555,7 @@ package android.support.v4.media.session {
     method public void onPlay();
     method public void onPlayFromMediaId(java.lang.String, android.os.Bundle);
     method public void onPlayFromSearch(java.lang.String, android.os.Bundle);
+    method public void onPlayFromUri(android.net.Uri, android.os.Bundle);
     method public void onRewind();
     method public void onSeekTo(long);
     method public void onSetRating(android.support.v4.media.RatingCompat);
@@ -1443,6 +1622,7 @@ package android.support.v4.media.session {
     field public static final long ACTION_PLAY = 4L; // 0x4L
     field public static final long ACTION_PLAY_FROM_MEDIA_ID = 1024L; // 0x400L
     field public static final long ACTION_PLAY_FROM_SEARCH = 2048L; // 0x800L
+    field public static final long ACTION_PLAY_FROM_URI = 8192L; // 0x2000L
     field public static final long ACTION_PLAY_PAUSE = 512L; // 0x200L
     field public static final long ACTION_REWIND = 8L; // 0x8L
     field public static final long ACTION_SEEK_TO = 256L; // 0x100L
@@ -1530,10 +1710,28 @@ package android.support.v4.os {
     method public static android.os.AsyncTask<Params, Progress, Result> executeParallel(android.os.AsyncTask<Params, Progress, Result>, Params...);
   }
 
+  public final class CancellationSignal {
+    ctor public CancellationSignal();
+    method public void cancel();
+    method public java.lang.Object getCancellationSignalObject();
+    method public boolean isCanceled();
+    method public void setOnCancelListener(android.support.v4.os.CancellationSignal.OnCancelListener);
+    method public void throwIfCanceled();
+  }
+
+  public static abstract interface CancellationSignal.OnCancelListener {
+    method public abstract void onCancel();
+  }
+
   public class EnvironmentCompat {
     ctor public EnvironmentCompat();
     method public static java.lang.String getStorageState(java.io.File);
     field public static final java.lang.String MEDIA_UNKNOWN = "unknown";
+  }
+
+  public class OperationCanceledException extends java.lang.RuntimeException {
+    ctor public OperationCanceledException();
+    ctor public OperationCanceledException(java.lang.String);
   }
 
   public class ParcelableCompat {
@@ -1637,8 +1835,7 @@ package android.support.v4.text {
 
   public class ICUCompat {
     ctor public ICUCompat();
-    method public static java.lang.String addLikelySubtags(java.lang.String);
-    method public static java.lang.String getScript(java.lang.String);
+    method public static java.lang.String maximizeAndGetScript(java.util.Locale);
   }
 
   public abstract interface TextDirectionHeuristicCompat {
@@ -2176,6 +2373,7 @@ package android.support.v4.view {
     method public static float getAlpha(android.view.View);
     method public static android.content.res.ColorStateList getBackgroundTintList(android.view.View);
     method public static android.graphics.PorterDuff.Mode getBackgroundTintMode(android.view.View);
+    method public static android.graphics.Rect getClipBounds(android.view.View);
     method public static float getElevation(android.view.View);
     method public static boolean getFitsSystemWindows(android.view.View);
     method public static int getImportantForAccessibility(android.view.View);
@@ -2208,6 +2406,7 @@ package android.support.v4.view {
     method public static float getZ(android.view.View);
     method public static boolean hasAccessibilityDelegate(android.view.View);
     method public static boolean hasNestedScrollingParent(android.view.View);
+    method public static boolean hasOverlappingRendering(android.view.View);
     method public static boolean hasTransientState(android.view.View);
     method public static boolean isAttachedToWindow(android.view.View);
     method public static boolean isLaidOut(android.view.View);
@@ -2235,6 +2434,7 @@ package android.support.v4.view {
     method public static void setBackgroundTintList(android.view.View, android.content.res.ColorStateList);
     method public static void setBackgroundTintMode(android.view.View, android.graphics.PorterDuff.Mode);
     method public static void setChildrenDrawingOrderEnabled(android.view.ViewGroup, boolean);
+    method public static void setClipBounds(android.view.View, android.graphics.Rect);
     method public static void setElevation(android.view.View, float);
     method public static void setFitsSystemWindows(android.view.View, boolean);
     method public static void setHasTransientState(android.view.View, boolean);
@@ -2520,7 +2720,9 @@ package android.support.v4.view.accessibility {
     method public void addAction(android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat);
     method public void addChild(android.view.View);
     method public void addChild(android.view.View, int);
+    method public boolean canOpenPopup();
     method public java.util.List<android.support.v4.view.accessibility.AccessibilityNodeInfoCompat> findAccessibilityNodeInfosByText(java.lang.String);
+    method public java.util.List<android.support.v4.view.accessibility.AccessibilityNodeInfoCompat> findAccessibilityNodeInfosByViewId(java.lang.String);
     method public android.support.v4.view.accessibility.AccessibilityNodeInfoCompat findFocus(int);
     method public android.support.v4.view.accessibility.AccessibilityNodeInfoCompat focusSearch(int);
     method public java.util.List<android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat> getActionList();
@@ -2534,24 +2736,37 @@ package android.support.v4.view.accessibility {
     method public android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.CollectionItemInfoCompat getCollectionItemInfo();
     method public java.lang.CharSequence getContentDescription();
     method public java.lang.CharSequence getError();
+    method public android.os.Bundle getExtras();
     method public java.lang.Object getInfo();
+    method public int getInputType();
+    method public android.support.v4.view.accessibility.AccessibilityNodeInfoCompat getLabelFor();
+    method public android.support.v4.view.accessibility.AccessibilityNodeInfoCompat getLabeledBy();
     method public int getLiveRegion();
+    method public int getMaxTextLength();
     method public int getMovementGranularities();
     method public java.lang.CharSequence getPackageName();
     method public android.support.v4.view.accessibility.AccessibilityNodeInfoCompat getParent();
     method public android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.RangeInfoCompat getRangeInfo();
     method public java.lang.CharSequence getText();
+    method public int getTextSelectionEnd();
+    method public int getTextSelectionStart();
+    method public android.support.v4.view.accessibility.AccessibilityNodeInfoCompat getTraversalAfter();
+    method public android.support.v4.view.accessibility.AccessibilityNodeInfoCompat getTraversalBefore();
     method public java.lang.String getViewIdResourceName();
+    method public android.support.v4.view.accessibility.AccessibilityWindowInfoCompat getWindow();
     method public int getWindowId();
     method public boolean isAccessibilityFocused();
     method public boolean isCheckable();
     method public boolean isChecked();
     method public boolean isClickable();
     method public boolean isContentInvalid();
+    method public boolean isDismissable();
+    method public boolean isEditable();
     method public boolean isEnabled();
     method public boolean isFocusable();
     method public boolean isFocused();
     method public boolean isLongClickable();
+    method public boolean isMultiLine();
     method public boolean isPassword();
     method public boolean isScrollable();
     method public boolean isSelected();
@@ -2563,9 +2778,14 @@ package android.support.v4.view.accessibility {
     method public boolean performAction(int);
     method public boolean performAction(int, android.os.Bundle);
     method public void recycle();
+    method public boolean refresh();
+    method public boolean removeAction(android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat);
+    method public boolean removeChild(android.view.View);
+    method public boolean removeChild(android.view.View, int);
     method public void setAccessibilityFocused(boolean);
     method public void setBoundsInParent(android.graphics.Rect);
     method public void setBoundsInScreen(android.graphics.Rect);
+    method public void setCanOpenPopup(boolean);
     method public void setCheckable(boolean);
     method public void setChecked(boolean);
     method public void setClassName(java.lang.CharSequence);
@@ -2574,24 +2794,37 @@ package android.support.v4.view.accessibility {
     method public void setCollectionItemInfo(java.lang.Object);
     method public void setContentDescription(java.lang.CharSequence);
     method public void setContentInvalid(boolean);
+    method public void setDismissable(boolean);
+    method public void setEditable(boolean);
     method public void setEnabled(boolean);
     method public void setError(java.lang.CharSequence);
     method public void setFocusable(boolean);
     method public void setFocused(boolean);
+    method public void setInputType(int);
     method public void setLabelFor(android.view.View);
     method public void setLabelFor(android.view.View, int);
+    method public void setLabeledBy(android.view.View);
+    method public void setLabeledBy(android.view.View, int);
     method public void setLiveRegion(int);
     method public void setLongClickable(boolean);
+    method public void setMaxTextLength(int);
     method public void setMovementGranularities(int);
+    method public void setMultiLine(boolean);
     method public void setPackageName(java.lang.CharSequence);
     method public void setParent(android.view.View);
     method public void setParent(android.view.View, int);
     method public void setPassword(boolean);
+    method public void setRangeInfo(android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.RangeInfoCompat);
     method public void setScrollable(boolean);
     method public void setSelected(boolean);
     method public void setSource(android.view.View);
     method public void setSource(android.view.View, int);
     method public void setText(java.lang.CharSequence);
+    method public void setTextSelection(int, int);
+    method public void setTraversalAfter(android.view.View);
+    method public void setTraversalAfter(android.view.View, int);
+    method public void setTraversalBefore(android.view.View);
+    method public void setTraversalBefore(android.view.View, int);
     method public void setViewIdResourceName(java.lang.String);
     method public void setVisibleToUser(boolean);
     field public static final int ACTION_ACCESSIBILITY_FOCUS = 64; // 0x40
@@ -2605,8 +2838,11 @@ package android.support.v4.view.accessibility {
     field public static final int ACTION_CLEAR_FOCUS = 2; // 0x2
     field public static final int ACTION_CLEAR_SELECTION = 8; // 0x8
     field public static final int ACTION_CLICK = 16; // 0x10
+    field public static final int ACTION_COLLAPSE = 524288; // 0x80000
     field public static final int ACTION_COPY = 16384; // 0x4000
     field public static final int ACTION_CUT = 65536; // 0x10000
+    field public static final int ACTION_DISMISS = 1048576; // 0x100000
+    field public static final int ACTION_EXPAND = 262144; // 0x40000
     field public static final int ACTION_FOCUS = 1; // 0x1
     field public static final int ACTION_LONG_CLICK = 32; // 0x20
     field public static final int ACTION_NEXT_AT_MOVEMENT_GRANULARITY = 256; // 0x100
@@ -2632,6 +2868,28 @@ package android.support.v4.view.accessibility {
     ctor public AccessibilityNodeInfoCompat.AccessibilityActionCompat(int, java.lang.CharSequence);
     method public int getId();
     method public java.lang.CharSequence getLabel();
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_ACCESSIBILITY_FOCUS;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_CLEAR_ACCESSIBILITY_FOCUS;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_CLEAR_FOCUS;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_CLEAR_SELECTION;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_CLICK;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_COLLAPSE;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_COPY;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_CUT;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_DISMISS;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_EXPAND;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_FOCUS;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_LONG_CLICK;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_NEXT_AT_MOVEMENT_GRANULARITY;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_NEXT_HTML_ELEMENT;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_PASTE;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_PREVIOUS_HTML_ELEMENT;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_SCROLL_BACKWARD;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_SCROLL_FORWARD;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_SELECT;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_SET_SELECTION;
+    field public static final android.support.v4.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat ACTION_SET_TEXT;
   }
 
   public static class AccessibilityNodeInfoCompat.CollectionInfoCompat {
@@ -2725,6 +2983,27 @@ package android.support.v4.view.accessibility {
     method public void setToIndex(int);
   }
 
+  public class AccessibilityWindowInfoCompat {
+    method public void getBoundsInScreen(android.graphics.Rect);
+    method public android.support.v4.view.accessibility.AccessibilityWindowInfoCompat getChild(int);
+    method public int getChildCount();
+    method public int getId();
+    method public int getLayer();
+    method public android.support.v4.view.accessibility.AccessibilityWindowInfoCompat getParent();
+    method public android.support.v4.view.accessibility.AccessibilityNodeInfoCompat getRoot();
+    method public int getType();
+    method public boolean isAccessibilityFocused();
+    method public boolean isActive();
+    method public boolean isFocused();
+    method public static android.support.v4.view.accessibility.AccessibilityWindowInfoCompat obtain();
+    method public static android.support.v4.view.accessibility.AccessibilityWindowInfoCompat obtain(android.support.v4.view.accessibility.AccessibilityWindowInfoCompat);
+    method public void recycle();
+    field public static final int TYPE_ACCESSIBILITY_OVERLAY = 4; // 0x4
+    field public static final int TYPE_APPLICATION = 1; // 0x1
+    field public static final int TYPE_INPUT_METHOD = 2; // 0x2
+    field public static final int TYPE_SYSTEM = 3; // 0x3
+  }
+
 }
 
 package android.support.v4.view.animation {
@@ -2783,6 +3062,14 @@ package android.support.v4.widget {
     field public static final float RELATIVE_UNSPECIFIED = 0.0f;
   }
 
+  public final class CompoundButtonCompat {
+    method public static android.graphics.drawable.Drawable getButtonDrawable(android.widget.CompoundButton);
+    method public static android.content.res.ColorStateList getButtonTintList(android.widget.CompoundButton);
+    method public static android.graphics.PorterDuff.Mode getButtonTintMode(android.widget.CompoundButton);
+    method public static void setButtonTintList(android.widget.CompoundButton, android.content.res.ColorStateList);
+    method public static void setButtonTintMode(android.widget.CompoundButton, android.graphics.PorterDuff.Mode);
+  }
+
   public class ContentLoadingProgressBar extends android.widget.ProgressBar {
     ctor public ContentLoadingProgressBar(android.content.Context);
     ctor public ContentLoadingProgressBar(android.content.Context, android.util.AttributeSet);
@@ -2824,6 +3111,7 @@ package android.support.v4.widget {
     method public void closeDrawer(android.view.View);
     method public void closeDrawer(int);
     method public void closeDrawers();
+    method public float getDrawerElevation();
     method public int getDrawerLockMode(int);
     method public int getDrawerLockMode(android.view.View);
     method public java.lang.CharSequence getDrawerTitle(int);
@@ -2836,6 +3124,7 @@ package android.support.v4.widget {
     method protected void onLayout(boolean, int, int, int, int);
     method public void openDrawer(android.view.View);
     method public void openDrawer(int);
+    method public void setDrawerElevation(float);
     method public void setDrawerListener(android.support.v4.widget.DrawerLayout.DrawerListener);
     method public void setDrawerLockMode(int);
     method public void setDrawerLockMode(int, int);
@@ -2908,8 +3197,10 @@ package android.support.v4.widget {
     method public void invalidateVirtualView(int);
     method protected abstract boolean onPerformActionForVirtualView(int, int, android.os.Bundle);
     method protected abstract void onPopulateEventForVirtualView(int, android.view.accessibility.AccessibilityEvent);
+    method public void onPopulateNodeForHost(android.support.v4.view.accessibility.AccessibilityNodeInfoCompat);
     method protected abstract void onPopulateNodeForVirtualView(int, android.support.v4.view.accessibility.AccessibilityNodeInfoCompat);
     method public boolean sendEventForVirtualView(int, int);
+    field public static final int HOST_ID = -1; // 0xffffffff
     field public static final int INVALID_ID = -2147483648; // 0x80000000
   }
 
@@ -2949,6 +3240,10 @@ package android.support.v4.widget {
   }
 
   public class PopupWindowCompat {
+    method public static boolean getOverlapAnchor(android.widget.PopupWindow);
+    method public static int getWindowLayoutType(android.widget.PopupWindow);
+    method public static void setOverlapAnchor(android.widget.PopupWindow, boolean);
+    method public static void setWindowLayoutType(android.widget.PopupWindow, int);
     method public static void showAsDropDown(android.widget.PopupWindow, android.view.View, int, int, int);
   }
 
@@ -3091,7 +3386,7 @@ package android.support.v4.widget {
     ctor public Space(android.content.Context);
   }
 
-  public class SwipeRefreshLayout extends android.view.ViewGroup {
+  public class SwipeRefreshLayout extends android.view.ViewGroup implements android.support.v4.view.NestedScrollingChild android.support.v4.view.NestedScrollingParent {
     ctor public SwipeRefreshLayout(android.content.Context);
     ctor public SwipeRefreshLayout(android.content.Context, android.util.AttributeSet);
     method public boolean canChildScrollUp();

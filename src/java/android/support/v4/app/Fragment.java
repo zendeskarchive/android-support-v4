@@ -22,11 +22,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.res.Resources;
-import android.content.res.TypedArray;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.annotation.StringRes;
 import android.support.v4.util.SimpleArrayMap;
@@ -89,20 +88,21 @@ final class FragmentState implements Parcelable {
         mArguments = in.readBundle();
         mSavedFragmentState = in.readBundle();
     }
-    
-    public Fragment instantiate(FragmentActivity activity, Fragment parent) {
+
+    public Fragment instantiate(FragmentHostCallback host, Fragment parent) {
         if (mInstance != null) {
             return mInstance;
         }
-        
+
+        final Context context = host.getContext();
         if (mArguments != null) {
-            mArguments.setClassLoader(activity.getClassLoader());
+            mArguments.setClassLoader(context.getClassLoader());
         }
-        
-        mInstance = Fragment.instantiate(activity, mClassName, mArguments);
-        
+
+        mInstance = Fragment.instantiate(context, mClassName, mArguments);
+
         if (mSavedFragmentState != null) {
-            mSavedFragmentState.setClassLoader(activity.getClassLoader());
+            mSavedFragmentState.setClassLoader(context.getClassLoader());
             mInstance.mSavedFragmentState = mSavedFragmentState;
         }
         mInstance.setIndex(mIndex, parent);
@@ -113,14 +113,14 @@ final class FragmentState implements Parcelable {
         mInstance.mTag = mTag;
         mInstance.mRetainInstance = mRetainInstance;
         mInstance.mDetached = mDetached;
-        mInstance.mFragmentManager = activity.mFragments;
+        mInstance.mFragmentManager = host.mFragmentManager;
 
         if (FragmentManagerImpl.DEBUG) Log.v(FragmentManagerImpl.TAG,
                 "Instantiated fragment " + mInstance);
 
         return mInstance;
     }
-    
+
     public int describeContents() {
         return 0;
     }
@@ -228,17 +228,17 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
 
     // True if this fragment has been restored from previously saved state.
     boolean mRestored;
-    
+
     // Number of active back stack entries this fragment is in.
     int mBackStackNesting;
-    
+
     // The fragment manager we are associated with.  Set as soon as the
     // fragment is used in a transaction; cleared after it has been removed
     // from all transactions.
     FragmentManagerImpl mFragmentManager;
 
-    // Activity this fragment is attached to.
-    FragmentActivity mActivity;
+    // Host this fragment is attached to.
+    FragmentHostCallback mHost;
 
     // Private fragment manager for child fragments inside of this one.
     FragmentManagerImpl mChildFragmentManager;
@@ -348,10 +348,12 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
 
         public static final Parcelable.Creator<SavedState> CREATOR
                 = new Parcelable.Creator<SavedState>() {
+            @Override
             public SavedState createFromParcel(Parcel in) {
                 return new SavedState(in, null);
             }
 
+            @Override
             public SavedState[] newArray(int size) {
                 return new SavedState[size];
             }
@@ -606,22 +608,39 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
     }
 
     /**
-     * Return the Activity this fragment is currently associated with.
+     * Return the {@link Context} this fragment is currently associated with.
+     */
+    public Context getContext() {
+        return mHost == null ? null : mHost.getContext();
+    }
+
+    /**
+     * Return the {@link FragmentActivity} this fragment is currently associated with.
+     * May return {@code null} if the fragment is associated with a {@link Context}
+     * instead.
      */
     final public FragmentActivity getActivity() {
-        return mActivity;
+        return mHost == null ? null : (FragmentActivity) mHost.getActivity();
     }
-    
+
+    /**
+     * Return the host object of this fragment. May return {@code null} if the fragment
+     * isn't currently being hosted.
+     */
+    final public Object getHost() {
+        return mHost == null ? null : mHost.onGetHost();
+    }
+
     /**
      * Return <code>getActivity().getResources()</code>.
      */
     final public Resources getResources() {
-        if (mActivity == null) {
+        if (mHost == null) {
             throw new IllegalStateException("Fragment " + this + " not attached to Activity");
         }
-        return mActivity.getResources();
+        return mHost.getContext().getResources();
     }
-    
+
     /**
      * Return a localized, styled CharSequence from the application's package's
      * default string table.
@@ -701,7 +720,7 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
      * Return true if the fragment is currently added to its activity.
      */
     final public boolean isAdded() {
-        return mActivity != null && mAdded;
+        return mHost != null && mAdded;
     }
 
     /**
@@ -812,14 +831,14 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
      * Report that this fragment would like to participate in populating
      * the options menu by receiving a call to {@link #onCreateOptionsMenu}
      * and related methods.
-     * 
+     *
      * @param hasMenu If true, the fragment has menu items to contribute.
      */
     public void setHasOptionsMenu(boolean hasMenu) {
         if (mHasMenu != hasMenu) {
             mHasMenu = hasMenu;
             if (isAdded() && !isHidden()) {
-                mActivity.supportInvalidateOptionsMenu();
+                mHost.onSupportInvalidateOptionsMenu();
             }
         }
     }
@@ -837,7 +856,7 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
         if (mMenuVisible != menuVisible) {
             mMenuVisible = menuVisible;
             if (mHasMenu && isAdded() && !isHidden()) {
-                mActivity.supportInvalidateOptionsMenu();
+                mHost.onSupportInvalidateOptionsMenu();
             }
         }
     }
@@ -878,42 +897,42 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
         if (mLoaderManager != null) {
             return mLoaderManager;
         }
-        if (mActivity == null) {
+        if (mHost == null) {
             throw new IllegalStateException("Fragment " + this + " not attached to Activity");
         }
         mCheckedForLoaderManager = true;
-        mLoaderManager = mActivity.getLoaderManager(mWho, mLoadersStarted, true);
+        mLoaderManager = mHost.getLoaderManager(mWho, mLoadersStarted, true);
         return mLoaderManager;
     }
-    
+
     /**
-     * Call {@link Activity#startActivity(Intent)} on the fragment's
+     * Call {@link Activity#startActivity(Intent)} from the fragment's
      * containing Activity.
      */
     public void startActivity(Intent intent) {
-        if (mActivity == null) {
+        if (mHost == null) {
             throw new IllegalStateException("Fragment " + this + " not attached to Activity");
         }
-        mActivity.startActivityFromFragment(this, intent, -1);
+        mHost.onStartActivityFromFragment(this /*fragment*/, intent, -1);
     }
-    
+
     /**
-     * Call {@link Activity#startActivityForResult(Intent, int)} on the fragment's
+     * Call {@link Activity#startActivityForResult(Intent, int)} from the fragment's
      * containing Activity.
      */
     public void startActivityForResult(Intent intent, int requestCode) {
-        if (mActivity == null) {
+        if (mHost == null) {
             throw new IllegalStateException("Fragment " + this + " not attached to Activity");
         }
-        mActivity.startActivityFromFragment(this, intent, requestCode);
+        mHost.onStartActivityFromFragment(this /*fragment*/, intent, requestCode);
     }
-    
+
     /**
      * Receive the result from a previous call to
      * {@link #startActivityForResult(Intent, int)}.  This follows the
      * related Activity API as described there in
      * {@link Activity#onActivityResult(int, int, Intent)}.
-     * 
+     *
      * @param requestCode The integer request code originally supplied to
      *                    startActivityForResult(), allowing you to identify who this
      *                    result came from.
@@ -924,19 +943,142 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
      */
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
     }
-    
+
+    /**
+     * Requests permissions to be granted to this application. These permissions
+     * must be requested in your manifest, they should not be granted to your app,
+     * and they should have protection level {@link android.content.pm.PermissionInfo
+     * #PROTECTION_DANGEROUS dangerous}, regardless whether they are declared by
+     * the platform or a third-party app.
+     * <p>
+     * Normal permissions {@link android.content.pm.PermissionInfo#PROTECTION_NORMAL}
+     * are granted at install time if requested in the manifest. Signature permissions
+     * {@link android.content.pm.PermissionInfo#PROTECTION_SIGNATURE} are granted at
+     * install time if requested in the manifest and the signature of your app matches
+     * the signature of the app declaring the permissions.
+     * </p>
+     * <p>
+     * If your app does not have the requested permissions the user will be presented
+     * with UI for accepting them. After the user has accepted or rejected the
+     * requested permissions you will receive a callback on {@link
+     * #onRequestPermissionsResult(int, String[], int[])} reporting whether the
+     * permissions were granted or not.
+     * </p>
+     * <p>
+     * Note that requesting a permission does not guarantee it will be granted and
+     * your app should be able to run without having this permission.
+     * </p>
+     * <p>
+     * This method may start an activity allowing the user to choose which permissions
+     * to grant and which to reject. Hence, you should be prepared that your activity
+     * may be paused and resumed. Further, granting some permissions may require
+     * a restart of you application. In such a case, the system will recreate the
+     * activity stack before delivering the result to {@link
+     * #onRequestPermissionsResult(int, String[], int[])}.
+     * </p>
+     * <p>
+     * When checking whether you have a permission you should use {@link
+     * android.content.Context#checkSelfPermission(String)}.
+     * </p>
+     * <p>
+     * A sample permissions request looks like this:
+     * </p>
+     * <code><pre><p>
+     * private void showContacts() {
+     *     if (getActivity().checkSelfPermission(Manifest.permission.READ_CONTACTS)
+     *             != PackageManager.PERMISSION_GRANTED) {
+     *         requestPermissions(new String[]{Manifest.permission.READ_CONTACTS},
+     *                 PERMISSIONS_REQUEST_READ_CONTACTS);
+     *     } else {
+     *         doShowContacts();
+     *     }
+     * }
+     *
+     * {@literal @}Override
+     * public void onRequestPermissionsResult(int requestCode, String[] permissions,
+     *         int[] grantResults) {
+     *     if (requestCode == PERMISSIONS_REQUEST_READ_CONTACTS
+     *             && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+     *         doShowContacts();
+     *     }
+     * }
+     * </code></pre></p>
+     *
+     * @param permissions The requested permissions.
+     * @param requestCode Application specific request code to match with a result
+     *    reported to {@link #onRequestPermissionsResult(int, String[], int[])}.
+     *
+     * @see #onRequestPermissionsResult(int, String[], int[])
+     * @see android.content.Context#checkSelfPermission(String)
+     */
+    public final void requestPermissions(@NonNull String[] permissions, int requestCode) {
+        if (mHost == null) {
+            throw new IllegalStateException("Fragment " + this + " not attached to Activity");
+        }
+        mHost.onRequestPermissionsFromFragment(this, permissions,requestCode);
+    }
+
+    /**
+     * Callback for the result from requesting permissions. This method
+     * is invoked for every call on {@link #requestPermissions(String[], int)}.
+     * <p>
+     * <strong>Note:</strong> It is possible that the permissions request interaction
+     * with the user is interrupted. In this case you will receive empty permissions
+     * and results arrays which should be treated as a cancellation.
+     * </p>
+     *
+     * @param requestCode The request code passed in {@link #requestPermissions(String[], int)}.
+     * @param permissions The requested permissions. Never null.
+     * @param grantResults The grant results for the corresponding permissions
+     *     which is either {@link android.content.pm.PackageManager#PERMISSION_GRANTED}
+     *     or {@link android.content.pm.PackageManager#PERMISSION_DENIED}. Never null.
+     *
+     * @see #requestPermissions(String[], int)
+     */
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+            @NonNull int[] grantResults) {
+        /* callback - do nothing */
+    }
+
+    /**
+     * Gets whether you should show UI with rationale for requesting a permission.
+     * You should do this only if you do not have the permission and the context in
+     * which the permission is requested does not clearly communicate to the user
+     * what would be the benefit from granting this permission.
+     * <p>
+     * For example, if you write a camera app, requesting the camera permission
+     * would be expected by the user and no rationale for why it is requested is
+     * needed. If however, the app needs location for tagging photos then a non-tech
+     * savvy user may wonder how location is related to taking photos. In this case
+     * you may choose to show UI with rationale of requesting this permission.
+     * </p>
+     *
+     * @param permission A permission your app wants to request.
+     * @return Whether you can show permission rationale UI.
+     *
+     * @see Context#checkSelfPermission(String)
+     * @see #requestPermissions(String[], int)
+     * @see #onRequestPermissionsResult(int, String[], int[])
+     */
+    public boolean shouldShowRequestPermissionRationale(@NonNull String permission) {
+        if (mHost != null) {
+            return mHost.onShouldShowRequestPermissionRationale(permission);
+        }
+        return false;
+    }
+
     /**
      * @hide Hack so that DialogFragment can make its Dialog before creating
      * its views, and the view construction can use the dialog's context for
      * inflation.  Maybe this should become a public API. Note sure.
      */
     public LayoutInflater getLayoutInflater(Bundle savedInstanceState) {
-        LayoutInflater result = mActivity.getLayoutInflater().cloneInContext(mActivity);
+        LayoutInflater result = mHost.onGetLayoutInflater();
         getChildFragmentManager(); // Init if needed; use raw implementation below.
         LayoutInflaterCompat.setFactory(result, mChildFragmentManager.getLayoutInflaterFactory());
         return result;
     }
-    
+
     /**
      * Called when a fragment is being created as part of a view layout
      * inflation, typically from setting the content view of an activity.  This
@@ -973,31 +1115,61 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
      * {@sample development/samples/ApiDemos/src/com/example/android/apis/app/FragmentArguments.java
      *      create}
      *
-     * @param activity The Activity that is inflating this fragment.
+     * @param context The Activity that is inflating this fragment.
      * @param attrs The attributes at the tag where the fragment is
      * being created.
      * @param savedInstanceState If the fragment is being re-created from
      * a previous saved state, this is the state.
      */
+    public void onInflate(Context context, AttributeSet attrs, Bundle savedInstanceState) {
+        mCalled = true;
+        final Activity hostActivity = mHost == null ? null : mHost.getActivity();
+        if (hostActivity != null) {
+            mCalled = false;
+            onInflate(hostActivity, attrs, savedInstanceState);
+        }
+    }
+
+    /**
+     * Called when a fragment is being created as part of a view layout
+     * inflation, typically from setting the content view of an activity.
+     * <p>Deprecated. See {@link #onInflate(Context, AttributeSet, Bundle)}.
+     */
+    @Deprecated
     public void onInflate(Activity activity, AttributeSet attrs, Bundle savedInstanceState) {
         mCalled = true;
     }
 
     /**
-     * Called when a fragment is first attached to its activity.
+     * Called when a fragment is first attached to its context.
      * {@link #onCreate(Bundle)} will be called after this.
      */
+    public void onAttach(Context context) {
+        mCalled = true;
+        final Activity hostActivity = mHost == null ? null : mHost.getActivity();
+        if (hostActivity != null) {
+            mCalled = false;
+            onAttach(hostActivity);
+        }
+    }
+
+    /**
+     * Called when a fragment is first attached to its activity.
+     * {@link #onCreate(Bundle)} will be called after this.
+     * <p>Deprecated. See {@link #onAttach(Context)}.
+     */
+    @Deprecated
     public void onAttach(Activity activity) {
         mCalled = true;
     }
-    
+
     /**
      * Called when a fragment loads an animation.
      */
     public Animation onCreateAnimation(int transit, boolean enter, int nextAnim) {
         return null;
     }
-    
+
     /**
      * Called to do initial creation of a fragment.  This is called after
      * {@link #onAttach(Activity)} and before
@@ -1104,19 +1276,19 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
      */
     public void onStart() {
         mCalled = true;
-        
+
         if (!mLoadersStarted) {
             mLoadersStarted = true;
             if (!mCheckedForLoaderManager) {
                 mCheckedForLoaderManager = true;
-                mLoaderManager = mActivity.getLoaderManager(mWho, mLoadersStarted, false);
+                mLoaderManager = mHost.getLoaderManager(mWho, mLoadersStarted, false);
             }
             if (mLoaderManager != null) {
                 mLoaderManager.doStart();
             }
         }
     }
-    
+
     /**
      * Called when the fragment is visible to the user and actively running.
      * This is generally
@@ -1198,7 +1370,7 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
         //        + " mLoaderManager=" + mLoaderManager);
         if (!mCheckedForLoaderManager) {
             mCheckedForLoaderManager = true;
-            mLoaderManager = mActivity.getLoaderManager(mWho, mLoadersStarted, false);
+            mLoaderManager = mHost.getLoaderManager(mWho, mLoadersStarted, false);
         }
         if (mLoaderManager != null) {
             mLoaderManager.doDestroy();
@@ -1223,7 +1395,7 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
         mBackStackNesting = 0;
         mFragmentManager = null;
         mChildFragmentManager = null;
-        mActivity = null;
+        mHost = null;
         mFragmentId = 0;
         mContainerId = 0;
         mTag = null;
@@ -1335,6 +1507,7 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
      * It is not safe to hold onto the context menu after this method returns.
      * {@inheritDoc}
      */
+    @Override
     public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
         getActivity().onCreateContextMenu(menu, v, menuInfo);
     }
@@ -1678,9 +1851,9 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
             writer.print(prefix); writer.print("mFragmentManager=");
                     writer.println(mFragmentManager);
         }
-        if (mActivity != null) {
-            writer.print(prefix); writer.print("mActivity=");
-                    writer.println(mActivity);
+        if (mHost != null) {
+            writer.print(prefix); writer.print("mHost=");
+                    writer.println(mHost);
         }
         if (mParentFragment != null) {
             writer.print(prefix); writer.print("mParentFragment=");
@@ -1741,10 +1914,10 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
 
     void instantiateChildFragmentManager() {
         mChildFragmentManager = new FragmentManagerImpl();
-        mChildFragmentManager.attachActivity(mActivity, new FragmentContainer() {
+        mChildFragmentManager.attachController(mHost, new FragmentContainer() {
             @Override
             @Nullable
-            public View findViewById(int id) {
+            public View onFindViewById(int id) {
                 if (mView == null) {
                     throw new IllegalStateException("Fragment does not have a view");
                 }
@@ -1752,7 +1925,7 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
             }
 
             @Override
-            public boolean hasView() {
+            public boolean onHasView() {
                 return (mView != null);
             }
         }, this);
@@ -1974,10 +2147,10 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
             mLoadersStarted = false;
             if (!mCheckedForLoaderManager) {
                 mCheckedForLoaderManager = true;
-                mLoaderManager = mActivity.getLoaderManager(mWho, mLoadersStarted, false);
+                mLoaderManager = mHost.getLoaderManager(mWho, mLoadersStarted, false);
             }
             if (mLoaderManager != null) {
-                if (!mActivity.mRetaining) {
+                if (!mRetaining) {
                     mLoaderManager.doStop();
                 } else {
                     mLoaderManager.doRetain();
