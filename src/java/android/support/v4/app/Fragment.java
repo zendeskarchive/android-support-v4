@@ -411,7 +411,7 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
      * the given fragment class.  This is a runtime exception; it is not
      * normally expected to happen.
      */
-    public static Fragment instantiate(Context context, String fname, Bundle args) {
+    public static Fragment instantiate(Context context, String fname, @Nullable Bundle args) {
         try {
             Class<?> clazz = sClassMap.get(fname);
             if (clazz == null) {
@@ -1023,7 +1023,7 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
      * @param savedInstanceState If the fragment is being re-created from
      * a previous saved state, this is the state.
      */
-    public void onCreate(Bundle savedInstanceState) {
+    public void onCreate(@Nullable Bundle savedInstanceState) {
         mCalled = true;
     }
 
@@ -1046,6 +1046,7 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
      * 
      * @return Return the View for the fragment's UI, or null.
      */
+    @Nullable
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container,
             @Nullable Bundle savedInstanceState) {
         return null;
@@ -1753,6 +1754,7 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
         mChildFragmentManager = new FragmentManagerImpl();
         mChildFragmentManager.attachActivity(mActivity, new FragmentContainer() {
             @Override
+            @Nullable
             public View findViewById(int id) {
                 if (mView == null) {
                     throw new IllegalStateException("Fragment does not have a view");

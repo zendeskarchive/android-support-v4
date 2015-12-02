@@ -47,4 +47,3 @@ dependencies {
   compile 'com.android.support:support-annotations:21.0.0'
 }
 
-apply from: '../gradle-mvn-publish.gradle'

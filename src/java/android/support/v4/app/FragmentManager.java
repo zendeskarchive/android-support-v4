@@ -20,16 +20,19 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.res.TypedArray;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.support.annotation.IdRes;
+import android.support.annotation.Nullable;
 import android.support.annotation.StringRes;
 import android.support.v4.util.DebugUtils;
 import android.support.v4.util.LogWriter;
 import android.support.v4.view.LayoutInflaterFactory;
+import android.support.v4.view.ViewCompat;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
@@ -407,6 +410,7 @@ final class FragmentManagerState implements Parcelable {
  * Callbacks from FragmentManagerImpl to its container.
  */
 interface FragmentContainer {
+    @Nullable
     public View findViewById(@IdRes int id);
     public boolean hasView();
 }
@@ -1043,7 +1047,11 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
                                 f.mSavedFragmentState), null, f.mSavedFragmentState);
                         if (f.mView != null) {
                             f.mInnerView = f.mView;
-                            f.mView = NoSaveStateFrameLayout.wrap(f.mView);
+                            if (Build.VERSION.SDK_INT >= 11) {
+                                ViewCompat.setSaveFromParentEnabled(f.mView, false);
+                            } else {
+                                f.mView = NoSaveStateFrameLayout.wrap(f.mView);
+                            }
                             if (f.mHidden) f.mView.setVisibility(View.GONE);
                             f.onViewCreated(f.mView, f.mSavedFragmentState);
                         } else {
@@ -1070,7 +1078,11 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
                                     f.mSavedFragmentState), container, f.mSavedFragmentState);
                             if (f.mView != null) {
                                 f.mInnerView = f.mView;
-                                f.mView = NoSaveStateFrameLayout.wrap(f.mView);
+                                if (Build.VERSION.SDK_INT >= 11) {
+                                    ViewCompat.setSaveFromParentEnabled(f.mView, false);
+                                } else {
+                                    f.mView = NoSaveStateFrameLayout.wrap(f.mView);
+                                }
                                 if (container != null) {
                                     Animation anim = loadAnimation(f, transit, true,
                                             transitionStyle);
@@ -2250,10 +2262,6 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
         return animAttr;
     }
 
-    LayoutInflaterFactory getLayoutInflaterFactory() {
-        return this;
-    }
-
     @Override
     public View onCreateView(View parent, String name, Context context, AttributeSet attrs) {
         if (!"fragment".equals(name)) {
@@ -2278,7 +2286,7 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
         int containerId = parent != null ? parent.getId() : 0;
         if (containerId == View.NO_ID && id == View.NO_ID && tag == null) {
             throw new IllegalArgumentException(attrs.getPositionDescription()
-                + ": Must specify unique android:id, android:tag, or have a parent with an id for " + fname);
+                    + ": Must specify unique android:id, android:tag, or have a parent with an id for " + fname);
         }
 
         // If we restored from a previous state, we may already have
@@ -2293,8 +2301,8 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
         }
 
         if (FragmentManagerImpl.DEBUG) Log.v(TAG, "onCreateView: id=0x"
-            + Integer.toHexString(id) + " fname=" + fname
-            + " existing=" + fragment);
+                + Integer.toHexString(id) + " fname=" + fname
+                + " existing=" + fragment);
         if (fragment == null) {
             fragment = Fragment.instantiate(context, fname);
             fragment.mFromLayout = true;
@@ -2310,9 +2318,9 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
             // A fragment already exists and it is not one we restored from
             // previous state.
             throw new IllegalArgumentException(attrs.getPositionDescription()
-                + ": Duplicate id 0x" + Integer.toHexString(id)
-                + ", tag " + tag + ", or parent id 0x" + Integer.toHexString(containerId)
-                + " with another fragment for " + fname);
+                    + ": Duplicate id 0x" + Integer.toHexString(id)
+                    + ", tag " + tag + ", or parent id 0x" + Integer.toHexString(containerId)
+                    + " with another fragment for " + fname);
         } else {
             // This fragment was retained from a previous instance; get it
             // going now.
@@ -2335,7 +2343,7 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
 
         if (fragment.mView == null) {
             throw new IllegalStateException("Fragment " + fname
-                + " did not create a view.");
+                    + " did not create a view.");
         }
         if (id != 0) {
             fragment.mView.setId(id);
@@ -2344,7 +2352,10 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
             fragment.mView.setTag(tag);
         }
         return fragment.mView;
+    }
 
+    LayoutInflaterFactory getLayoutInflaterFactory() {
+        return this;
     }
 
     static class FragmentTag {
