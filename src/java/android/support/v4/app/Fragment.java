@@ -269,7 +269,7 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
     // If set this fragment would like its instance retained across
     // configuration changes.
     boolean mRetainInstance;
-    
+
     // If set this fragment is being retained across the current config change.
     boolean mRetaining;
     
@@ -2150,10 +2150,10 @@ public class Fragment implements ComponentCallbacks, OnCreateContextMenuListener
                 mLoaderManager = mHost.getLoaderManager(mWho, mLoadersStarted, false);
             }
             if (mLoaderManager != null) {
-                if (!mRetaining) {
-                    mLoaderManager.doStop();
-                } else {
+                if (mHost.getRetainLoaders()) {
                     mLoaderManager.doRetain();
+                } else {
+                    mLoaderManager.doStop();
                 }
             }
         }
