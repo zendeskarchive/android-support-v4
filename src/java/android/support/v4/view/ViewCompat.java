@@ -24,8 +24,10 @@ import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.support.annotation.FloatRange;
 import android.support.annotation.IdRes;
 import android.support.annotation.IntDef;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.view.accessibility.AccessibilityNodeInfoCompat;
 import android.support.v4.view.accessibility.AccessibilityNodeProviderCompat;
@@ -275,6 +277,73 @@ public class ViewCompat {
      */
     public static final int SCROLL_AXIS_VERTICAL = 1 << 1;
 
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(flag = true,
+            value = {
+                    SCROLL_INDICATOR_TOP,
+                    SCROLL_INDICATOR_BOTTOM,
+                    SCROLL_INDICATOR_LEFT,
+                    SCROLL_INDICATOR_RIGHT,
+                    SCROLL_INDICATOR_START,
+                    SCROLL_INDICATOR_END,
+            })
+    public @interface ScrollIndicators {}
+
+    /**
+     * Scroll indicator direction for the top edge of the view.
+     *
+     * @see #setScrollIndicators(int)
+     * @see #setScrollIndicators(int, int)
+     * @see #getScrollIndicators()
+     */
+    public static final int SCROLL_INDICATOR_TOP = 0x1;
+
+    /**
+     * Scroll indicator direction for the bottom edge of the view.
+     *
+     * @see #setScrollIndicators(int)
+     * @see #setScrollIndicators(int, int)
+     * @see #getScrollIndicators()
+     */
+    public static final int SCROLL_INDICATOR_BOTTOM = 0x2;
+
+    /**
+     * Scroll indicator direction for the left edge of the view.
+     *
+     * @see #setScrollIndicators(int)
+     * @see #setScrollIndicators(int, int)
+     * @see #getScrollIndicators()
+     */
+    public static final int SCROLL_INDICATOR_LEFT = 0x4;
+
+    /**
+     * Scroll indicator direction for the right edge of the view.
+     *
+     * @see #setScrollIndicators(int)
+     * @see #setScrollIndicators(int, int)
+     * @see #getScrollIndicators()
+     */
+    public static final int SCROLL_INDICATOR_RIGHT = 0x8;
+
+    /**
+     * Scroll indicator direction for the starting edge of the view.
+     *
+     * @see #setScrollIndicators(View, int)
+     * @see #setScrollIndicators(View, int, int)
+     * @see #getScrollIndicators(View)
+     */
+    public static final int SCROLL_INDICATOR_START = 0x10;
+
+    /**
+     * Scroll indicator direction for the ending edge of the view.
+     *
+     * @see #setScrollIndicators(int)
+     * @see #setScrollIndicators(int, int)
+     * @see #getScrollIndicators()
+     */
+    public static final int SCROLL_INDICATOR_END = 0x20;
+
     interface ViewCompatImpl {
         public boolean canScrollHorizontally(View v, int direction);
         public boolean canScrollVertically(View v, int direction);
@@ -347,12 +416,15 @@ public class ViewCompat {
         public float getElevation(View view);
         public void setTranslationZ(View view, float translationZ);
         public float getTranslationZ(View view);
+        public void setClipBounds(View view, Rect clipBounds);
+        public Rect getClipBounds(View view);
         public void setTransitionName(View view, String transitionName);
         public String getTransitionName(View view);
         public int getWindowSystemUiVisibility(View view);
         public void requestApplyInsets(View view);
         public void setChildrenDrawingOrderEnabled(ViewGroup viewGroup, boolean enabled);
         public boolean getFitsSystemWindows(View view);
+        public boolean hasOverlappingRendering(View view);
         void setFitsSystemWindows(View view, boolean fitSystemWindows);
         void jumpDrawablesToCurrentState(View v);
         void setOnApplyWindowInsetsListener(View view, OnApplyWindowInsetsListener listener);
@@ -380,6 +452,10 @@ public class ViewCompat {
         int combineMeasuredStates(int curState, int newState);
         public float getZ(View view);
         public boolean isAttachedToWindow(View view);
+        public boolean hasOnClickListeners(View view);
+        public void setScrollIndicators(View view, int indicators);
+        public void setScrollIndicators(View view, int indicators, int mask);
+        public int getScrollIndicators(View view);
     }
 
     static class BaseViewCompatImpl implements ViewCompatImpl {
@@ -579,6 +655,11 @@ public class ViewCompat {
             }
         }
 
+        @Override
+        public boolean hasOverlappingRendering(View view) {
+            return true;
+        }
+
         private void bindTempDetach() {
             try {
                 mDispatchStartTemporaryDetach = View.class.getDeclaredMethod(
@@ -755,6 +836,15 @@ public class ViewCompat {
         @Override
         public float getTranslationZ(View view) {
             return 0f;
+        }
+
+        @Override
+        public void setClipBounds(View view, Rect clipBounds) {
+        }
+
+        @Override
+        public Rect getClipBounds(View view) {
+            return null;
         }
 
         @Override
@@ -944,6 +1034,26 @@ public class ViewCompat {
         @Override
         public boolean isAttachedToWindow(View view) {
             return ViewCompatBase.isAttachedToWindow(view);
+        }
+
+        @Override
+        public boolean hasOnClickListeners(View view) {
+            return false;
+        }
+
+        @Override
+        public int getScrollIndicators(View view) {
+            return 0;
+        }
+
+        @Override
+        public void setScrollIndicators(View view, int indicators) {
+            // no-op
+        }
+
+        @Override
+        public void setScrollIndicators(View view, int indicators, int mask) {
+            // no-op
         }
     }
 
@@ -1204,7 +1314,14 @@ public class ViewCompat {
         }
     }
 
-    static class JBViewCompatImpl extends ICSViewCompatImpl {
+    static class ICSMr1ViewCompatImpl extends ICSViewCompatImpl {
+        @Override
+        public boolean hasOnClickListeners(View view) {
+            return ViewCompatICSMr1.hasOnClickListeners(view);
+        }
+    }
+
+    static class JBViewCompatImpl extends ICSMr1ViewCompatImpl {
         @Override
         public boolean hasTransientState(View view) {
             return ViewCompatJB.hasTransientState(view);
@@ -1280,6 +1397,11 @@ public class ViewCompat {
         public boolean getFitsSystemWindows(View view) {
             return ViewCompatJB.getFitsSystemWindows(view);
         }
+
+        @Override
+        public boolean hasOverlappingRendering(View view) {
+            return ViewCompatJB.hasOverlappingRendering(view);
+        }
     }
 
     static class JbMr1ViewCompatImpl extends JBViewCompatImpl {
@@ -1335,7 +1457,19 @@ public class ViewCompat {
         }
     }
 
-    static class KitKatViewCompatImpl extends JbMr1ViewCompatImpl {
+    static class JbMr2ViewCompatImpl extends JbMr1ViewCompatImpl {
+        @Override
+        public void setClipBounds(View view, Rect clipBounds) {
+            ViewCompatJellybeanMr2.setClipBounds(view, clipBounds);
+        }
+
+        @Override
+        public Rect getClipBounds(View view) {
+            return ViewCompatJellybeanMr2.getClipBounds(view);
+        }
+    }
+
+    static class KitKatViewCompatImpl extends JbMr2ViewCompatImpl {
         @Override
         public int getAccessibilityLiveRegion(View view) {
             return ViewCompatKitKat.getAccessibilityLiveRegion(view);
@@ -1494,10 +1628,29 @@ public class ViewCompat {
         }
     }
 
+    static class MarshmallowViewCompatImpl extends LollipopViewCompatImpl {
+        @Override
+        public void setScrollIndicators(View view, int indicators) {
+            ViewCompatMarshmallow.setScrollIndicators(view, indicators);
+        }
+
+        @Override
+        public void setScrollIndicators(View view, int indicators, int mask) {
+            ViewCompatMarshmallow.setScrollIndicators(view, indicators, mask);
+        }
+
+        @Override
+        public int getScrollIndicators(View view) {
+            return ViewCompatMarshmallow.getScrollIndicators(view);
+        }
+    }
+
     static final ViewCompatImpl IMPL;
     static {
         final int version = android.os.Build.VERSION.SDK_INT;
-        if (version >= 21) {
+        if (version >= 23) {
+            IMPL = new MarshmallowViewCompatImpl();
+        } else if (version >= 21) {
             IMPL = new LollipopViewCompatImpl();
         } else if (version >= 19) {
             IMPL = new KitKatViewCompatImpl();
@@ -1505,6 +1658,8 @@ public class ViewCompat {
             IMPL = new JbMr1ViewCompatImpl();
         } else if (version >= 16) {
             IMPL = new JBViewCompatImpl();
+        } else if (version >= 15) {
+            IMPL = new ICSMr1ViewCompatImpl();
         } else if (version >= 14) {
             IMPL = new ICSViewCompatImpl();
         } else if (version >= 11) {
@@ -2334,7 +2489,7 @@ public class ViewCompat {
      *
      * @param value The opacity of the view.
      */
-    public static void setAlpha(View view, float value) {
+    public static void setAlpha(View view, @FloatRange(from=0.0, to=1.0) float value) {
         IMPL.setAlpha(view, value);
     }
 
@@ -2478,7 +2633,7 @@ public class ViewCompat {
      * @param value The y location of the pivot point.
      */
     public static void setPivotY(View view, float value) {
-        IMPL.setPivotX(view, value);
+        IMPL.setPivotY(view, value);
     }
 
     public static float getRotation(View view) {
@@ -2687,6 +2842,24 @@ public class ViewCompat {
      */
     public static void setActivated(View view, boolean activated) {
         IMPL.setActivated(view, activated);
+    }
+
+    /**
+     * Returns whether this View has content which overlaps.
+     *
+     * <p>This function, intended to be overridden by specific View types, is an optimization when
+     * alpha is set on a view. If rendering overlaps in a view with alpha < 1, that view is drawn to
+     * an offscreen buffer and then composited into place, which can be expensive. If the view has
+     * no overlapping rendering, the view can draw each primitive with the appropriate alpha value
+     * directly. An example of overlapping rendering is a TextView with a background image, such as
+     * a Button. An example of non-overlapping rendering is a TextView with no background, or an
+     * ImageView with only the foreground image. The default implementation returns true; subclasses
+     * should override if they have cases which can be optimized.</p>
+     *
+     * @return true if the content in this view might overlap, false otherwise.
+     */
+    public static boolean hasOverlappingRendering(View view) {
+        return IMPL.hasOverlappingRendering(view);
     }
 
     /**
@@ -3000,9 +3173,108 @@ public class ViewCompat {
     }
 
     /**
+     * Sets a rectangular area on this view to which the view will be clipped
+     * when it is drawn. Setting the value to null will remove the clip bounds
+     * and the view will draw normally, using its full bounds.
+     *
+     * <p>Prior to API 18 this does nothing.</p>
+     *
+     * @param view       The view to set clipBounds.
+     * @param clipBounds The rectangular area, in the local coordinates of
+     * this view, to which future drawing operations will be clipped.
+     */
+    public static void setClipBounds(View view, Rect clipBounds) {
+        IMPL.setClipBounds(view, clipBounds);
+    }
+
+    /**
+     * Returns a copy of the current {@link #setClipBounds(View, Rect)}.
+     *
+     * <p>Prior to API 18 this will return null.</p>
+     *
+     * @return A copy of the current clip bounds if clip bounds are set,
+     * otherwise null.
+     */
+    public static Rect getClipBounds(View view) {
+        return IMPL.getClipBounds(view);
+    }
+
+    /**
      * Returns true if the provided view is currently attached to a window.
      */
     public static boolean isAttachedToWindow(View view) {
         return IMPL.isAttachedToWindow(view);
+    }
+
+    /**
+     * Returns whether the provided view has an attached {@link View.OnClickListener}.
+     *
+     * @return true if there is a listener, false if there is none.
+     */
+    public static boolean hasOnClickListeners(View view) {
+        return IMPL.hasOnClickListeners(view);
+    }
+
+    /**
+     * Sets the state of all scroll indicators.
+     * <p>
+     * See {@link #setScrollIndicators(View, int, int)} for usage information.
+     *
+     * @param indicators a bitmask of indicators that should be enabled, or
+     *                   {@code 0} to disable all indicators
+     *
+     * @see #setScrollIndicators(View, int, int)
+     * @see #getScrollIndicators(View)
+     */
+    public static void setScrollIndicators(@NonNull View view, @ScrollIndicators int indicators) {
+        IMPL.setScrollIndicators(view, indicators);
+    }
+
+    /**
+     * Sets the state of the scroll indicators specified by the mask. To change
+     * all scroll indicators at once, see {@link #setScrollIndicators(View, int)}.
+     * <p>
+     * When a scroll indicator is enabled, it will be displayed if the view
+     * can scroll in the direction of the indicator.
+     * <p>
+     * Multiple indicator types may be enabled or disabled by passing the
+     * logical OR of the desired types. If multiple types are specified, they
+     * will all be set to the same enabled state.
+     * <p>
+     * For example, to enable the top scroll indicatorExample: {@code setScrollIndicators}
+     *
+     * @param indicators the indicator direction, or the logical OR of multiple
+     *             indicator directions. One or more of:
+     *             <ul>
+     *               <li>{@link #SCROLL_INDICATOR_TOP}</li>
+     *               <li>{@link #SCROLL_INDICATOR_BOTTOM}</li>
+     *               <li>{@link #SCROLL_INDICATOR_LEFT}</li>
+     *               <li>{@link #SCROLL_INDICATOR_RIGHT}</li>
+     *               <li>{@link #SCROLL_INDICATOR_START}</li>
+     *               <li>{@link #SCROLL_INDICATOR_END}</li>
+     *             </ul>
+     *
+     * @see #setScrollIndicators(View, int)
+     * @see #getScrollIndicators(View)
+     */
+    public static void setScrollIndicators(@NonNull View view, @ScrollIndicators int indicators,
+            @ScrollIndicators int mask) {
+        IMPL.setScrollIndicators(view, indicators, mask);
+    }
+
+    /**
+     * Returns a bitmask representing the enabled scroll indicators.
+     * <p>
+     * For example, if the top and left scroll indicators are enabled and all
+     * other indicators are disabled, the return value will be
+     * {@code ViewCompat.SCROLL_INDICATOR_TOP | ViewCompat.SCROLL_INDICATOR_LEFT}.
+     * <p>
+     * To check whether the bottom scroll indicator is enabled, use the value
+     * of {@code (ViewCompat.getScrollIndicators(view) & ViewCompat.SCROLL_INDICATOR_BOTTOM) != 0}.
+     *
+     * @return a bitmask representing the enabled scroll indicators
+     */
+    public static int getScrollIndicators(@NonNull View view) {
+        return IMPL.getScrollIndicators(view);
     }
 }

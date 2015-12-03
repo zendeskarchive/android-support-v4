@@ -26,6 +26,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcelable;
+import android.support.annotation.ColorInt;
 import android.support.v4.view.GravityCompat;
 import android.view.Gravity;
 import android.widget.RemoteViews;
@@ -342,6 +343,7 @@ public class NotificationCompat {
      * telling the system not to decorate this notification with any special color but instead use
      * default colors when presenting this notification.
      */
+    @ColorInt
     public static final int COLOR_DEFAULT = Color.TRANSPARENT;
 
     /**
@@ -1198,7 +1200,7 @@ public class NotificationCompat {
          * rate.  The rate is specified in terms of the number of milliseconds to be on
          * and then the number of milliseconds to be off.
          */
-        public Builder setLights(int argb, int onMs, int offMs) {
+        public Builder setLights(@ColorInt int argb, int onMs, int offMs) {
             mNotification.ledARGB = argb;
             mNotification.ledOnMS = onMs;
             mNotification.ledOffMS = offMs;
@@ -1504,7 +1506,7 @@ public class NotificationCompat {
          *
          * @return The same Builder.
          */
-        public Builder setColor(int argb) {
+        public Builder setColor(@ColorInt int argb) {
             mColor = argb;
             return this;
         }
@@ -2245,7 +2247,7 @@ public class NotificationCompat {
          * Size value for use with {@link #setCustomSizePreset} to show this notification with
          * default sizing.
          * <p>For custom display notifications created using {@link #setDisplayIntent},
-         * the default is {@link #SIZE_LARGE}. All other notifications size automatically based
+         * the default is {@link #SIZE_MEDIUM}. All other notifications size automatically based
          * on their content.
          */
         public static final int SIZE_DEFAULT = 0;
@@ -3012,7 +3014,7 @@ public class NotificationCompat {
          * automotive setting. This method can be used to override the color provided in the
          * notification in such a situation.
          */
-        public CarExtender setColor(int color) {
+        public CarExtender setColor(@ColorInt int color) {
             mColor = color;
             return this;
         }
@@ -3022,6 +3024,7 @@ public class NotificationCompat {
          *
          * @see setColor
          */
+        @ColorInt
         public int getColor() {
             return mColor;
         }
