@@ -24,6 +24,7 @@ import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.support.annotation.FloatRange;
 import android.support.annotation.IdRes;
 import android.support.annotation.IntDef;
 import android.support.annotation.Nullable;
@@ -347,12 +348,15 @@ public class ViewCompat {
         public float getElevation(View view);
         public void setTranslationZ(View view, float translationZ);
         public float getTranslationZ(View view);
+        public void setClipBounds(View view, Rect clipBounds);
+        public Rect getClipBounds(View view);
         public void setTransitionName(View view, String transitionName);
         public String getTransitionName(View view);
         public int getWindowSystemUiVisibility(View view);
         public void requestApplyInsets(View view);
         public void setChildrenDrawingOrderEnabled(ViewGroup viewGroup, boolean enabled);
         public boolean getFitsSystemWindows(View view);
+        public boolean hasOverlappingRendering(View view);
         void setFitsSystemWindows(View view, boolean fitSystemWindows);
         void jumpDrawablesToCurrentState(View v);
         void setOnApplyWindowInsetsListener(View view, OnApplyWindowInsetsListener listener);
@@ -579,6 +583,11 @@ public class ViewCompat {
             }
         }
 
+        @Override
+        public boolean hasOverlappingRendering(View view) {
+            return true;
+        }
+
         private void bindTempDetach() {
             try {
                 mDispatchStartTemporaryDetach = View.class.getDeclaredMethod(
@@ -755,6 +764,15 @@ public class ViewCompat {
         @Override
         public float getTranslationZ(View view) {
             return 0f;
+        }
+
+        @Override
+        public void setClipBounds(View view, Rect clipBounds) {
+        }
+
+        @Override
+        public Rect getClipBounds(View view) {
+            return null;
         }
 
         @Override
@@ -1280,6 +1298,11 @@ public class ViewCompat {
         public boolean getFitsSystemWindows(View view) {
             return ViewCompatJB.getFitsSystemWindows(view);
         }
+
+        @Override
+        public boolean hasOverlappingRendering(View view) {
+            return ViewCompatJB.hasOverlappingRendering(view);
+        }
     }
 
     static class JbMr1ViewCompatImpl extends JBViewCompatImpl {
@@ -1335,7 +1358,19 @@ public class ViewCompat {
         }
     }
 
-    static class KitKatViewCompatImpl extends JbMr1ViewCompatImpl {
+    static class JbMr2ViewCompatImpl extends JbMr1ViewCompatImpl {
+        @Override
+        public void setClipBounds(View view, Rect clipBounds) {
+            ViewCompatJellybeanMr2.setClipBounds(view, clipBounds);
+        }
+
+        @Override
+        public Rect getClipBounds(View view) {
+            return ViewCompatJellybeanMr2.getClipBounds(view);
+        }
+    }
+
+    static class KitKatViewCompatImpl extends JbMr2ViewCompatImpl {
         @Override
         public int getAccessibilityLiveRegion(View view) {
             return ViewCompatKitKat.getAccessibilityLiveRegion(view);
@@ -2334,7 +2369,7 @@ public class ViewCompat {
      *
      * @param value The opacity of the view.
      */
-    public static void setAlpha(View view, float value) {
+    public static void setAlpha(View view, @FloatRange(from=0.0, to=1.0) float value) {
         IMPL.setAlpha(view, value);
     }
 
@@ -2690,6 +2725,24 @@ public class ViewCompat {
     }
 
     /**
+     * Returns whether this View has content which overlaps.
+     *
+     * <p>This function, intended to be overridden by specific View types, is an optimization when
+     * alpha is set on a view. If rendering overlaps in a view with alpha < 1, that view is drawn to
+     * an offscreen buffer and then composited into place, which can be expensive. If the view has
+     * no overlapping rendering, the view can draw each primitive with the appropriate alpha value
+     * directly. An example of overlapping rendering is a TextView with a background image, such as
+     * a Button. An example of non-overlapping rendering is a TextView with no background, or an
+     * ImageView with only the foreground image. The default implementation returns true; subclasses
+     * should override if they have cases which can be optimized.</p>
+     *
+     * @return true if the content in this view might overlap, false otherwise.
+     */
+    public static boolean hasOverlappingRendering(View view) {
+        return IMPL.hasOverlappingRendering(view);
+    }
+
+    /**
      * Return if the padding as been set through relative values
      * {@code View.setPaddingRelative(int, int, int, int)} or thru
      *
@@ -2997,6 +3050,33 @@ public class ViewCompat {
             // We need to manually invalidate pre-honeycomb
             view.invalidate();
         }
+    }
+
+    /**
+     * Sets a rectangular area on this view to which the view will be clipped
+     * when it is drawn. Setting the value to null will remove the clip bounds
+     * and the view will draw normally, using its full bounds.
+     *
+     * <p>Prior to API 18 this does nothing.</p>
+     *
+     * @param view       The view to set clipBounds.
+     * @param clipBounds The rectangular area, in the local coordinates of
+     * this view, to which future drawing operations will be clipped.
+     */
+    public static void setClipBounds(View view, Rect clipBounds) {
+        IMPL.setClipBounds(view, clipBounds);
+    }
+
+    /**
+     * Returns a copy of the current {@link #setClipBounds(View, Rect)}.
+     *
+     * <p>Prior to API 18 this will return null.</p>
+     *
+     * @return A copy of the current clip bounds if clip bounds are set,
+     * otherwise null.
+     */
+    public static Rect getClipBounds(View view) {
+        return IMPL.getClipBounds(view);
     }
 
     /**

@@ -21,9 +21,12 @@ import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.SystemClock;
+import android.support.annotation.IntDef;
 import android.support.annotation.Nullable;
 import android.text.TextUtils;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,6 +36,16 @@ import java.util.List;
  * and the current control capabilities.
  */
 public final class PlaybackStateCompat implements Parcelable {
+
+    /**
+     * @hide
+     */
+    @IntDef(flag=true, value={ACTION_STOP, ACTION_PAUSE, ACTION_PLAY, ACTION_REWIND,
+            ACTION_SKIP_TO_PREVIOUS, ACTION_SKIP_TO_NEXT, ACTION_FAST_FORWARD, ACTION_SET_RATING,
+            ACTION_SEEK_TO, ACTION_PLAY_PAUSE, ACTION_PLAY_FROM_MEDIA_ID, ACTION_PLAY_FROM_SEARCH,
+            ACTION_SKIP_TO_QUEUE_ITEM, ACTION_PLAY_FROM_URI})
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface Actions {}
 
     /**
      * Indicates this session supports the stop command.
@@ -124,6 +137,21 @@ public final class PlaybackStateCompat implements Parcelable {
      * @see Builder#setActions(long)
      */
     public static final long ACTION_SKIP_TO_QUEUE_ITEM = 1 << 12;
+    /**
+     * Indicates this session supports the play from URI command.
+     *
+     * @see Builder#setActions(long)
+     */
+    public static final long ACTION_PLAY_FROM_URI = 1 << 13;
+
+    /**
+     * @hide
+     */
+    @IntDef({STATE_NONE, STATE_STOPPED, STATE_PAUSED, STATE_PLAYING, STATE_FAST_FORWARDING,
+            STATE_REWINDING, STATE_BUFFERING, STATE_ERROR, STATE_CONNECTING,
+            STATE_SKIPPING_TO_PREVIOUS, STATE_SKIPPING_TO_NEXT, STATE_SKIPPING_TO_QUEUE_ITEM})
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface State {}
 
     /**
      * This is the default playback state and indicates that no media has been
@@ -320,6 +348,7 @@ public final class PlaybackStateCompat implements Parcelable {
      * <li> {@link PlaybackStateCompat#STATE_SKIPPING_TO_NEXT}</li>
      * <li> {@link PlaybackStateCompat#STATE_SKIPPING_TO_QUEUE_ITEM}</li>
      */
+    @State
     public int getState() {
         return mState;
     }
@@ -368,8 +397,10 @@ public final class PlaybackStateCompat implements Parcelable {
      * <li> {@link PlaybackStateCompat#ACTION_PLAY_FROM_MEDIA_ID}</li>
      * <li> {@link PlaybackStateCompat#ACTION_PLAY_FROM_SEARCH}</li>
      * <li> {@link PlaybackStateCompat#ACTION_SKIP_TO_QUEUE_ITEM}</li>
+     * <li> {@link PlaybackStateCompat#ACTION_PLAY_FROM_URI}</li>
      * </ul>
      */
+    @Actions
     public long getActions() {
         return mActions;
     }
@@ -796,7 +827,7 @@ public final class PlaybackStateCompat implements Parcelable {
          * @param playbackSpeed The current rate of playback as a multiple of
          *            normal playback.
          */
-        public Builder setState(int state, long position, float playbackSpeed) {
+        public Builder setState(@State int state, long position, float playbackSpeed) {
             return setState(state, position, playbackSpeed, SystemClock.elapsedRealtime());
         }
 
@@ -834,7 +865,8 @@ public final class PlaybackStateCompat implements Parcelable {
          *            timebase that the position was updated at.
          * @return this
          */
-        public Builder setState(int state, long position, float playbackSpeed, long updateTime) {
+        public Builder setState(@State int state, long position, float playbackSpeed,
+                long updateTime) {
             mState = state;
             mPosition = position;
             mUpdateTime = updateTime;
@@ -871,11 +903,12 @@ public final class PlaybackStateCompat implements Parcelable {
          * <li> {@link PlaybackStateCompat#ACTION_PLAY_FROM_MEDIA_ID}</li>
          * <li> {@link PlaybackStateCompat#ACTION_PLAY_FROM_SEARCH}</li>
          * <li> {@link PlaybackStateCompat#ACTION_SKIP_TO_QUEUE_ITEM}</li>
+         * <li> {@link PlaybackStateCompat#ACTION_PLAY_FROM_URI}</li>
          * </ul>
          *
          * @return this
          */
-        public Builder setActions(long capabilities) {
+        public Builder setActions(@Actions long capabilities) {
             mActions = capabilities;
             return this;
         }
