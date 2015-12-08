@@ -672,8 +672,6 @@ class LoaderManagerImpl extends LoaderManager {
                         // Now we have three active loaders... we'll queue
                         // up this request to be processed once one of the other loaders
                         // finishes or is canceled.
-                        if (DEBUG) Log.v(TAG, "  Current loader is running; attempting to cancel");
-                        info.cancel();
                         if (info.mPendingLoader != null) {
                             if (DEBUG) Log.v(TAG, "  Removing pending loader: " + info.mPendingLoader);
                             info.mPendingLoader.destroy();
@@ -682,7 +680,13 @@ class LoaderManagerImpl extends LoaderManager {
                         if (DEBUG) Log.v(TAG, "  Enqueuing as new pending loader");
                         info.mPendingLoader = createLoader(id, args, 
                                 (LoaderManager.LoaderCallbacks<Object>)callback);
-                        return (Loader<D>)info.mPendingLoader.mLoader;
+
+                        Loader<D> loader = (Loader<D>)info.mPendingLoader.mLoader;
+
+                        if (DEBUG) Log.v(TAG, "  Current loader is running; attempting to cancel");
+                        info.cancel();
+
+                        return loader;
                     }
                 }
             } else {
