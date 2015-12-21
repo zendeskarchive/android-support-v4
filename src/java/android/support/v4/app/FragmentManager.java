@@ -28,6 +28,7 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.support.annotation.CallSuper;
 import android.support.annotation.IdRes;
+import android.support.annotation.NonNull;
 import android.support.annotation.StringRes;
 import android.support.v4.util.DebugUtils;
 import android.support.v4.util.LogWriter;
@@ -366,6 +367,10 @@ public abstract class FragmentManager {
 
     abstract int getActivityRequestCode(Fragment fragment);
     abstract void onActivityResult(int requestCode, int resultCode, Intent data);
+
+    abstract int getPermissionsRequestCode(Fragment fragment);
+    abstract void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                             @NonNull int[] grantResults);
 }
 
 final class FragmentManagerState implements Parcelable {
@@ -373,6 +378,7 @@ final class FragmentManagerState implements Parcelable {
     int[] mAdded;
     BackStackState[] mBackStack;
     ActivityRequest[] mPendingActivityRequests;
+    PermissionsRequest[] mPendingPermissionsRequests;
 
     public FragmentManagerState() {
     }
@@ -382,6 +388,7 @@ final class FragmentManagerState implements Parcelable {
         mAdded = in.createIntArray();
         mBackStack = in.createTypedArray(BackStackState.CREATOR);
         mPendingActivityRequests = in.createTypedArray(ActivityRequest.CREATOR);
+        mPendingPermissionsRequests = in.createTypedArray(PermissionsRequest.CREATOR);
     }
     
     public int describeContents() {
@@ -393,6 +400,7 @@ final class FragmentManagerState implements Parcelable {
         dest.writeIntArray(mAdded);
         dest.writeTypedArray(mBackStack, flags);
         dest.writeTypedArray(mPendingActivityRequests, flags);
+        dest.writeTypedArray(mPendingPermissionsRequests, flags);
     }
     
     public static final Parcelable.Creator<FragmentManagerState> CREATOR
@@ -444,6 +452,47 @@ final class ActivityRequest implements Parcelable {
 
         public ActivityRequest[] newArray(int size) {
             return new ActivityRequest[size];
+        }
+    };
+}
+
+final class PermissionsRequest implements Parcelable {
+    final int mFragmentIndex;
+    final int mRequestIndex;
+    final int mChildRequestIndex;
+
+    PermissionsRequest(int fragmentIndex, int requestIndex, int childRequestIndex) {
+        mFragmentIndex = fragmentIndex;
+        mRequestIndex = requestIndex;
+        mChildRequestIndex = childRequestIndex;
+    }
+
+    PermissionsRequest(Parcel in) {
+        mFragmentIndex = in.readInt();
+        mRequestIndex = in.readInt();
+        mChildRequestIndex = in.readInt();
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeInt(mFragmentIndex);
+        dest.writeInt(mRequestIndex);
+        dest.writeInt(mChildRequestIndex);
+    }
+
+    public static final Parcelable.Creator<PermissionsRequest> CREATOR
+            = new Parcelable.Creator<PermissionsRequest>() {
+        public PermissionsRequest createFromParcel(Parcel in) {
+            return new PermissionsRequest(in);
+        }
+
+        public PermissionsRequest[] newArray(int size) {
+            return new PermissionsRequest[size];
         }
     };
 }
@@ -537,6 +586,8 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
     ArrayList<Fragment> mCreatedMenus;
     ArrayList<ActivityRequest> mPendingActivityRequests;
     ArrayList<Integer> mAvailRequestIndices;
+    ArrayList<PermissionsRequest> mPendingPermissionsRequests;
+    ArrayList<Integer> mAvailPermissionsRequestIndices;
 
     // Must be accessed while locked.
     ArrayList<BackStackRecord> mBackStackIndices;
@@ -941,6 +992,77 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
             );
         } else {
             fragment.onActivityResult(requestCode, resultCode, data);
+            return true;
+        }
+    }
+
+    @Override
+    int getPermissionsRequestCode(Fragment fragment) {
+        return getPermissionsRequestIndex(fragment, -1) + 1;
+    }
+
+    private int getPermissionsRequestIndex(Fragment fragment, int childRequestIndex) {
+        final PermissionsRequest request;
+
+        if (mAvailPermissionsRequestIndices == null || mAvailPermissionsRequestIndices.isEmpty()) {
+            if (mPendingPermissionsRequests == null) {
+                mPendingPermissionsRequests = new ArrayList<PermissionsRequest>();
+            }
+
+            if (mPendingPermissionsRequests.size() > 0xff) {
+                throw new IllegalStateException("Over 0xff pending permissions requests in " + fragment);
+            }
+
+            request = new PermissionsRequest(fragment.mIndex, mPendingPermissionsRequests.size(), childRequestIndex);
+            mPendingPermissionsRequests.add(request);
+        } else {
+            request = new PermissionsRequest(fragment.mIndex, mAvailPermissionsRequestIndices.remove(mAvailPermissionsRequestIndices.size() - 1), childRequestIndex);
+            mPendingPermissionsRequests.set(request.mRequestIndex, request);
+        }
+
+        Fragment parent = fragment.getParentFragment();
+        if (parent != null) {
+            return parent.mFragmentManager.getPermissionsRequestIndex(parent, request.mRequestIndex);
+        } else {
+            return request.mRequestIndex;
+        }
+    }
+
+    @Override
+    void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                    @NonNull int[] grantResults) {
+        if (!dispatchOnRequestPermissionsResult((requestCode>>8) - 1, requestCode&0xff,
+                permissions, grantResults)) {
+            Log.w(TAG, "No fragment exists for requestCode: 0x" + Integer.toHexString(requestCode));
+        }
+    }
+
+    private boolean dispatchOnRequestPermissionsResult(int requestIndex, int requestCode,
+                                                       @NonNull String[] permissions,
+                                                       @NonNull int[] grantResults) {
+        if (!checkElement(mPendingPermissionsRequests, requestIndex)) {
+            return false;
+        }
+
+        PermissionsRequest resultRequest = mPendingPermissionsRequests.get(requestIndex);
+        if (!checkElement(mActive, resultRequest.mFragmentIndex)) {
+            return false;
+        }
+
+        Fragment fragment = mActive.get(resultRequest.mFragmentIndex);
+        if (resultRequest.mChildRequestIndex != -1) {
+            mPendingPermissionsRequests.set(requestIndex, null);
+            if (mAvailPermissionsRequestIndices == null) {
+                mAvailPermissionsRequestIndices = new ArrayList<Integer>();
+            }
+            mAvailPermissionsRequestIndices.add(requestIndex);
+
+            return fragment.mChildFragmentManager.dispatchOnRequestPermissionsResult(
+                    resultRequest.mChildRequestIndex,
+                    requestCode, permissions, grantResults
+            );
+        } else {
+            fragment.onRequestPermissionsResult(requestCode, permissions, grantResults);
             return true;
         }
     }
@@ -2028,11 +2150,18 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
             pendingActivityRequests = mPendingActivityRequests.toArray(new ActivityRequest[mPendingActivityRequests.size()]);
         }
 
+        // Save pending permissions requests
+        PermissionsRequest[] pendingPermissionsRequests = null;
+        if (mPendingPermissionsRequests != null) {
+            pendingPermissionsRequests = mPendingPermissionsRequests.toArray(new PermissionsRequest[mPendingPermissionsRequests.size()]);
+        }
+
         FragmentManagerState fms = new FragmentManagerState();
         fms.mActive = active;
         fms.mAdded = added;
         fms.mBackStack = backStack;
         fms.mPendingActivityRequests = pendingActivityRequests;
+        fms.mPendingPermissionsRequests = pendingPermissionsRequests;
         return fms;
     }
     
@@ -2162,6 +2291,22 @@ final class FragmentManagerImpl extends FragmentManager implements LayoutInflate
                 }
             }
             mPendingActivityRequests = new ArrayList<ActivityRequest>(Arrays.asList(fms.mPendingActivityRequests));
+        }
+
+        // Restore pending permissions requests
+        if (fms.mPendingPermissionsRequests != null) {
+            mPendingPermissionsRequests = new ArrayList<PermissionsRequest>();
+            if (mAvailPermissionsRequestIndices != null) {
+                mAvailPermissionsRequestIndices.clear();
+            } else {
+                mAvailPermissionsRequestIndices = new ArrayList<Integer>();
+            }
+            for (int i=0; i<fms.mPendingPermissionsRequests.length; i++) {
+                if (fms.mPendingPermissionsRequests[i] == null) {
+                    mAvailPermissionsRequestIndices.add(i);
+                }
+            }
+            mPendingPermissionsRequests = new ArrayList<PermissionsRequest>(Arrays.asList(fms.mPendingPermissionsRequests));
         }
     }
 

@@ -804,22 +804,7 @@ public class FragmentActivity extends BaseFragmentActivityHoneycomb implements
             @NonNull int[] grantResults) {
         int index = (requestCode>>8)&0xff;
         if (index != 0) {
-            index--;
-            final int activeFragmentsCount = mFragments.getActiveFragmentsCount();
-            if (activeFragmentsCount == 0 || index < 0 || index >= activeFragmentsCount) {
-                Log.w(TAG, "Activity result fragment index out of range: 0x"
-                        + Integer.toHexString(requestCode));
-                return;
-            }
-            final List<Fragment> activeFragments =
-                    mFragments.getActiveFragments(new ArrayList<Fragment>(activeFragmentsCount));
-            Fragment frag = activeFragments.get(index);
-            if (frag == null) {
-                Log.w(TAG, "Activity result no fragment exists for index: 0x"
-                        + Integer.toHexString(requestCode));
-            } else {
-                frag.onRequestPermissionsResult(requestCode&0xff, permissions, grantResults);
-            }
+            getSupportFragmentManager().onRequestPermissionsResult(requestCode, permissions, grantResults);
         }
     }
 
@@ -852,7 +837,7 @@ public class FragmentActivity extends BaseFragmentActivityHoneycomb implements
         }
         mRequestedPermissionsFromFragment = true;
         ActivityCompat.requestPermissions(this, permissions,
-                ((fragment.mIndex + 1) << 8) + (requestCode & 0xff));
+                (fragment.getFragmentManager().getPermissionsRequestCode(fragment)<<8) + (requestCode&0xff));
     }
 
     class HostCallbacks extends FragmentHostCallback<FragmentActivity> {
