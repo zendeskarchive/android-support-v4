@@ -26,11 +26,15 @@ Already fixed in latest [support lib](https://android.googlesource.com/platform/
 Fixed in support lib ([1](https://android.googlesource.com/platform/frameworks/support/+/86f3b80ddf7f9aa5c5b7afe77217cb75632d62a2), [2](https://android.googlesource.com/platform/frameworks/support/+/0157c98cff15bc790b4837cb96cb240afc4839ed))
 
 ### Fix invalid `Fragment` state restoring ([part 1](https://github.com/futuresimple/android-support-v4/commit/1cb001df6d6724abb37b74f4e9409967a0f63605), [part 2](https://github.com/futuresimple/android-support-v4/commit/85f5595faa603cf5c42fac1dac80c6e52801133a)).
-If I remember correctly, this is an intermingled state machines extravaganza, a bug on the joint of `LoaderManager`, `FragmentManager` and `FragmentStatePagerAdapter`. To give the support lib authors justice, I suspect that this bug might have been a result of our misuse of aforementioned APIs. On the other hand a well designed API should prevent or withstand any kind of abuse.
+This is an intermingled state machines extravaganza, a bug on the joint of `LoaderManager`, `FragmentManager` and `FragmentStatePagerAdapter`.
 
-Unfortunately, the detailed memories of my trip through this abbyss has already faded, so it's hard to tell if this bug was somehow addressed in the recent versions of support lib.
+In some cases the child `Fragments` initialize their identifier (`mWho` internal property) before their parents, and due to the `null` behavior in Java `String` concatenation they end up with `null:0` identifier instead of `android:fragment:0:1` or something like this. 
+
+This identifier is used for `LoaderManager` initialization. If you have multiple `Fragments` with child `Fragments` added to `ViewPager`, they might end up sharing the `LoaderManager` instance, and when they use the same `Loader`s ids, you end up with data corruption, `ClassCastException` or `LoaderCallbacks` deregistering one another.
+
+I verified that this bug exists in old support-v4 version, it was fixed in this fork and it was fixed in the upstream as well.
 
 # The future of this fork
 Is not bright. Maintaining it before The Great Support Lib Split was already a pain in the ass, and I expect the merge with the current upstream to be at least twice as painful.
 
-From my perspective the only issue that have to be addressed/checked before switching to latest upstream version is the `Fragment` state restoration crap. The other changes have either negligible impact or were already fixed in the upstream.
+All critical issues were already fixed in the upstream and the other changes have negligible impact.
